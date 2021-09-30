@@ -1,0 +1,17 @@
+# hide because of spotify client keys
+conf/snap/spt/current/.config/spotify-tui/client.yml
+
+# hide because it's a submodule
+zsh/oh-my-zsh/
+zsh/.histfile
+
+# hide ssh keys and known hosts
+conf/.ssh/*_rsa*
+conf/.ssh/*_ed*
+conf/.ssh/known_hosts
+
+# hide the gpg db
+conf/.gnupg
+
+# hide any json web tokens
+conf/.config/google-calendar-api/*.json
