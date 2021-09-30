@@ -25,12 +25,25 @@
 	trackup = "!f(){ local UPSTREAM=\"${1:-origin/`git pwb`}\"; git branch --set-upstream-to=$UPSTREAM; };f"
 	undo = reset --soft HEAD^
 	ff = merge --ff-only
-	pr = "!f(){ local to_branch=${1:-main}; local from_branch=${2:-$(git rev-parse --abbrev-ref HEAD)}; local origin=$(git config --get remote.origin.url); local org=$(echo $origin | sed -e 's/.*[\\/:]\\([^/]*\\)\\/[^/]*$/\\1/'); local repo=$(basename `git rev-parse --show-toplevel`); open \"https://github.com/$org/$repo/pull/new/$to_branch...$from_branch\"; };f"
+	pr = "!f(){ local to_branch=${1:-main}; local from_branch=${2:-$(git rev-parse --abbrev-ref HEAD)}; local origin=$(git config --get remote.origin.url); local org=$(echo $origin | sed -e 's/.*[\\/:]\\([^/]*\\)\\/[^/]*$/\\1/'); local repo=$(basename `git rev-parse --show-toplevel`); xdg-open \"https://github.com/$org/$repo/pull/new/$to_branch...$from_branch\"; };f"
 	id = "! git config user.name \"$(git config user.$1.name)\"; git config user.email \"$(git config user.$1.email)\"; git config user.signingkey \"$(git config user.$1.signingkey)\"; :"
 	recent = "!git branch --sort=-committerdate --color=always --format='%(color:reset)%(if)%(HEAD)%(then)→ %(align:26,left)%(color:bold green)%(authorname)%(color:reset)%(end) %(align:28,left)%(color:white dim)%(authordate:relative)%(color:reset)%(end) %(color:green) %(refname:short) %(else)%(color:reset)  %(align:24,left)%(color:magenta)%(authorname)%(color:reset)%(end) %(align:28,left)%(color:white dim)%(authordate:relative)%(color:reset)%(end)  %(refname:short)%(end)'"
 
 [core]
 	autocrlf = input
+  editor = code --wait
+
+[diff]
+  tool = vscode
+
+[difftool "vscode"]
+  cmd = code --wait --diff $LOCAL $REMOTE
+
+[merge]
+  tool = vscode
+	
+[mergetool "vscode"]
+  cmd = code --wait $MERGED
 
 [commit]
 	gpgSign = true
