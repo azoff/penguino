@@ -67,12 +67,16 @@ gdm3:
 	sudo ln -svf $(ROOT_DIR)/conf/etc/gdm3/custom.conf /etc/gdm3/custom.conf
 
 # debian packages
-apts: apt-setup snapd dropbox franz 1password copyq zoom zsh git
+apts: apt-setup snapd dropbox franz 1password copyq zoom zsh git guake
 
 # git vcs config
 git:
 	sudo apt install -y git git-lfs
 	ln -svf $(ROOT_DIR)/git/.gitconfig $(HOME)/.gitconfig
+
+guake:
+	sudo apt install -y guake
+	sudo update-alternatives --install /usr/bin/x-terminal-emulator x-terminal-emulator $( which guake ) 10
 
 # a more modern shell
 zsh:
