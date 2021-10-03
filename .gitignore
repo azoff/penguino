@@ -4,6 +4,7 @@ conf/snap/spt/current/.config/spotify-tui/client.yml
 # hide because it's a submodule
 zsh/oh-my-zsh/
 zsh/.histfile
+zsh/local.zsh
 
 # hide ssh keys and known hosts
 conf/.ssh/*_rsa*
