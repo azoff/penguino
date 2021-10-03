@@ -5,7 +5,12 @@ ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 everything: conf apts flatpaks snaps dev
 
 # developer tools
-dev: nodenv python3 golang open zoom-launcher
+dev: nodenv python3 golang open zoom-launcher macos
+
+# https://github.com/foxlet/macOS-Simple-KVM
+macos:
+	git clone git@github.com:foxlet/macOS-Simple-KVM.git $(HOME)/Code/foxlet/macOS-Simple-KVM
+	sudo apt install -y qemu-system qemu-utils
 
 open:
 	$(shell "[[ -f /usr/bin/open ]] && sudo mv -v /usr/bin/open /usr/bin/open-perl")
@@ -37,7 +42,10 @@ nodenv:
 	curl -fsSL https://raw.githubusercontent.com/nodenv/nodenv-installer/master/bin/nodenv-installer | bash
 
 # system settings
-conf: dconf gdm3 deepsleep ssh gpg
+conf: dconf gdm3 deepsleep ssh gpg x11
+
+x11:
+	sudo ln -svf $(ROOT_DIR)/conf/etc/X11/20-intel.conf /etc/X11/20-intel.conf 
 
 # set up local configs
 ssh:
