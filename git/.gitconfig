@@ -1,3 +1,5 @@
+# guidance: https://jvns.ca/blog/2024/02/16/popular-git-config-options/
+
 [color]
 	branch = auto
 	diff = auto
@@ -7,27 +9,32 @@
 	cam = "!f(){ git add -A && git commit -m \"$1\"; };f"
 	can = "!f(){ git add -A && git commit --no-verify -m \"$1\"; };f"
 	cum = "!f(){ git add -u && git commit -m \"$1\"; };f"
-	drop = "!f(){ local BRANCH=${1:-`git pwb`} && git checkout ${2:-main} && git branch -D $BRANCH; };f"
+	cem = "!f(){ git commit --allow-empty --no-verify -m \"$1\"; };f"
+	drop = "!f(){ local BRANCH=${1:-$(git pwb)} && git checkout ${2:-$(git pdb)} && git branch -D $BRANCH; };f"
 	hundo = reset --hard ${1:-HEAD}
 	ignore = "!f(){ git update-index --skip-worktree $@; };f"
 	unignore = "!f(){ git update-index --no-skip-worktree $@; };f"
 	newb = checkout -b
+	onto = "!f(){ git plum && git drop $(git pwb) ${2:-origin/$(git pdb)} && git newb ${1}; };f"
 	next = "!f(){ git add -u && git rebase --continue; };f"
-	plum = fetch --prune
 	pog = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)%Creset' --abbrev-commit
-	rum = "!f(){ git plum && git merge --no-edit --rerere-autoupdate --ff ${1:-origin/main} && git trackup $1 && git push; };f"
+	rum = "!f(){ git plum && git merge --no-edit --rerere-autoupdate --ff ${1:-origin/$(git pdb)} && git trackup $1 && git push; };f"
 	puss = push --force-with-lease
 	pufu = "!f(){ local BRANCH=`git pwb` && local REMOTE=${1:-'origin'} && git puss -u $REMOTE $BRANCH; };f"
 	pwb = "!f(){ git rev-parse --abbrev-ref HEAD; };f"
-	resolve = "!f(){ git status --porcelain | grep UU | cut -d' ' -f2 | xargs ${1:-smerge}; };f"
+	pdb = "!f(){ git config init.defaultBranch; };f"
+	resolve = "!f(){ git status --porcelain | grep UU | cut -d' ' -f2 | xargs ${EDITOR:-smerge}; };f"
 	subinit = submodule update --init --recursive
-	squash = "!f(){ set -x && local REF=${1:-origin/main}; local MSG=$(git log --format=%B --reverse $REF..HEAD); git reset --soft $REF && git commit --edit -m\"$MSG\"; };f"
+	squash = "!f(){ set -x && local REF=${1:-origin/$(git pdb)}; local MSG=$(git log --format=%B --reverse $REF..HEAD); git reset --soft $REF && git commit --no-verify --edit -m\"$MSG\"; };f"
 	trackup = "!f(){ local UPSTREAM=\"${1:-origin/`git pwb`}\"; git branch --set-upstream-to=$UPSTREAM; };f"
 	undo = reset --soft HEAD^
 	ff = merge --ff-only
-	pr = "!f(){ local to_branch=${1:-main}; local from_branch=${2:-$(git rev-parse --abbrev-ref HEAD)}; local origin=$(git config --get remote.origin.url); local org=$(echo $origin | sed -e 's/.*[\\/:]\\([^/]*\\)\\/[^/]*$/\\1/'); local repo=$(basename `git rev-parse --show-toplevel`); xdg-open \"https://github.com/$org/$repo/pull/new/$to_branch...$from_branch\"; };f"
+	pr = "!f(){ local to_branch=${1:-$(git pdb)}; local from_branch=${2:-$(git rev-parse --abbrev-ref HEAD)}; local origin=$(git config --get remote.origin.url); local org=$(echo $origin | sed -e 's/.*[\\/:]\\([^/]*\\)\\/[^/]*$/\\1/'); local repo=$(basename `git rev-parse --show-toplevel`); xdg-open \"https://github.com/$org/$repo/pull/new/$to_branch...$from_branch\"; };f"
 	id = "! git config user.name \"$(git config user.$1.name)\"; git config user.email \"$(git config user.$1.email)\"; git config user.signingkey \"$(git config user.$1.signingkey)\"; :"
 	recent = "!git branch --sort=-committerdate --color=always --format='%(color:reset)%(if)%(HEAD)%(then)→ %(align:26,left)%(color:bold green)%(authorname)%(color:reset)%(end) %(align:28,left)%(color:white dim)%(authordate:relative)%(color:reset)%(end) %(color:green) %(refname:short) %(else)%(color:reset)  %(align:24,left)%(color:magenta)%(authorname)%(color:reset)%(end) %(align:28,left)%(color:white dim)%(authordate:relative)%(color:reset)%(end)  %(refname:short)%(end)'"
+
+[branch]
+	sort = committerdate
 
 [core]
 	autocrlf = input
@@ -35,22 +42,37 @@
 
 [diff]
   tool = vscode
+	algorithm = histogram # https://luppeng.wordpress.com/2020/10/10/when-to-use-each-of-the-git-diff-algorithms/
 
 [difftool "vscode"]
   cmd = code --wait --diff $LOCAL $REMOTE
 
 [merge]
   tool = vscode
+	conflictstyle = diff3
 	
 [mergetool "vscode"]
   cmd = code --wait $MERGED
 
 [commit]
 	gpgSign = true
+	verbose = true
+
+[fetch]
+	prune = true
+	purnetags = true
+	fsckobjects = true
+
+[help]
+	autocorrect = prompt
 
 [push]
-	default = simple
+	default = current
 	followTags = true
+
+[rebase]
+	autoSquash = true
+	autoStash = true
 
 [rerere]
 	enabled = true
@@ -70,10 +92,29 @@
 [user "azof.fr"]
 	name = Jonathan Azoff
 	email = jon@azof.fr
-	signingkey = 61D853599966F9DB
 
 [user "sno.llc"]
 	name = Jonathan Azoff
 	email = jon@sno.llc
-	signingkey = 62A2033292DB5CF1
 
+[user "postmodern.llc"]
+	name = Jonathan Azoff
+	email = jon@postmodern.llc
+	signingkey = A1DBBAD35587970A
+
+[user "cardless.com"]
+	name = Jonathan Azoff
+	email = jon@cardless.com
+	signingkey = 49F0D78D8F7696A9
+
+[url "git@github.com:"]
+	insteadOf = "https://github.com/"
+
+[init]
+	defaultBranch = main
+
+[receive]
+	fsckobjects = true
+
+[tag]
+	sort = taggerdate

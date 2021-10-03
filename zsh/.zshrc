@@ -7,3 +7,4 @@ source ${ZSH_HOME}/opts.zsh
 source ${ZSH_HOME}/aliases.zsh
 source ${ZSH_HOME}/prompt.zsh
 source ${ZSH_HOME}/dev.zsh
+[[ -f ${ZSH_HOME}/local.zsh ]] && source ${ZSH_HOME}/local.zsh
