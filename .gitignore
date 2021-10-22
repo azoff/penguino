@@ -14,5 +14,8 @@ conf/.ssh/known_hosts
 # hide the gpg db
 conf/.gnupg
 
+# hide sensitive dconf settings
+conf/settings.dconf
+
 # hide any json web tokens
 conf/.config/google-calendar-api/*.json
