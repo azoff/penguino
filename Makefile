@@ -5,7 +5,14 @@ ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 everything: conf apts flatpaks snaps dev
 
 # developer tools
-dev: nodenv python3 golang open zoom-launcher macos
+dev: nodenv python3 golang open zoom-launcher macos docker
+
+kubectl:
+	sudo apt install -y kubectl
+
+docker:
+	sudo apt install -y docker-ce docker-ce-cli containerd.io
+	sudo setfacl --modify user:$(USER):rw /var/run/docker.sock 
 
 # https://github.com/foxlet/macOS-Simple-KVM
 macos:
@@ -42,10 +49,13 @@ nodenv:
 	curl -fsSL https://raw.githubusercontent.com/nodenv/nodenv-installer/master/bin/nodenv-installer | bash
 
 # system settings
-conf: dconf gdm3 deepsleep ssh gpg x11
+conf: dconf gdm3 deepsleep ssh gpg x11 wayland-fractional
+
+wayland-fractional:
+	gsettings set org.gnome.mutter experimental-features "['scale-monitor-framebuffer']"
 
 x11:
-	sudo ln -svf $(ROOT_DIR)/conf/etc/X11/20-intel.conf /etc/X11/20-intel.conf 
+	sudo ln -svf $(ROOT_DIR)/conf/etc/X11/xorg.conf.d/20-intel.conf /etc/X11/xorg.conf.d/20-intel.conf 
 
 # set up local configs
 ssh:
@@ -75,7 +85,10 @@ gdm3:
 	sudo ln -svf $(ROOT_DIR)/conf/etc/gdm3/custom.conf /etc/gdm3/custom.conf
 
 # debian packages
-apts: apt-setup snapd dropbox franz 1password copyq zoom zsh git guake
+apts: apt-setup snapd dropbox 1password copyq zoom zsh git guake chrome-gnome-shell
+
+chrome-gnome-shell:
+	sudo apt install chrome-gnome-shell
 
 # git vcs config
 git:
@@ -106,16 +119,18 @@ zoom:
 	curl -L https://zoom.us/client/latest/zoom_amd64.deb > /tmp/zoom.deb
 	sudo apt install -y /tmp/zoom.deb
 
-
 # screencapture app
-peek:
-	sudo apt -y install peek
-
+# peek:
+#		sudo add-apt-repository -y ppa:peek-developers/stable # missing release file!
+# 	sudo apt -y install peek
 
 # gets apt ready to go
 apt-setup:
 	sudo add-apt-repository -y ppa:hluk/copyq
-	sudo add-apt-repository -y ppa:peek-developers/stable
+	curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+	sudo curl -fsSLo /usr/share/keyrings/kubernetes-archive-keyring.gpg https://packages.cloud.google.com/apt/doc/apt-key.gpg
+	echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+	echo "deb [signed-by=/usr/share/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
 	sudo apt update
 	sudo apt upgrade -y
 	sudo apt dist-upgrade
@@ -130,11 +145,6 @@ snapd:
 dropbox:
 	curl -L https://www.dropbox.com/download?dl=packages/ubuntu/dropbox_2020.03.04_amd64.deb > /tmp/dropbox.deb
 	sudo apt install -y python3-gpg /tmp/dropbox.deb
-	
-# chat system
-franz:
-	curl -L https://github.com/meetfranz/franz/releases/download/v5.7.0/franz_5.7.0_amd64.deb > /tmp/franz.deb
-	sudo apt install -y /tmp/franz.deb
 
 # complete, installable apps for pop_os
 flatpaks: spotify chromium slack vscode
@@ -150,7 +160,14 @@ slack:
 	flatpak install -y flathub com.slack.Slack
 
 # complete, installable apps for ubuntu
-snaps: spt vscode mailspring
+snaps: spt vscode mailspring whatsapp-for-linux thunderbird
+
+# mail and calendar (lightning)
+thunderbird:
+	sudo snap install thunderbird
+
+whatsapp-for-linux:
+	sudo snap install whatsapp-for-linux
 
 # installs vscode, also makes it the default
 vscode:
