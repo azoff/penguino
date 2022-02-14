@@ -57,8 +57,8 @@ nodenv:
 conf: dconf gdm3 deepsleep ssh gpg x11 wayland-fractional acpi
 
 acpi:
-	sudo ln -svf $(ROOT_DIR)/conf/etc/acpi/events/lineout /etc/acpi/events/lineout 
-	sudo ln -svf $(ROOT_DIR)/sbin/pactl-reset.sh /usr/local/sbin/pactl-reset.sh
+	sudo ln -svf $(ROOT_DIR)/conf/etc/acpi/events/pactl-reset /etc/acpi/events/pactl-reset 
+	sudo ln -svf $(ROOT_DIR)/conf/etc/acpi/pactl-reset.sh /etc/acpi/pactl-reset.sh
 
 wayland-fractional:
 	gsettings set org.gnome.mutter experimental-features "['scale-monitor-framebuffer']"
