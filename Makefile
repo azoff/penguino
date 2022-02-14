@@ -5,7 +5,7 @@ ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 everything: conf apts flatpaks snaps dev
 
 # developer tools
-dev: nodenv python3 golang open zoom-launcher macos docker
+dev: nodenv python3 golang open zoom-launcher macos docker docker-compose
 
 kubectl:
 	sudo apt install -y kubectl
@@ -13,6 +13,11 @@ kubectl:
 docker:
 	sudo apt install -y docker-ce docker-ce-cli containerd.io
 	sudo setfacl --modify user:$(USER):rw /var/run/docker.sock 
+
+docker-compose:
+	sudo curl -L "https://github.com/docker/compose/releases/download/1.27.4/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+	sudo chmod +x /usr/local/bin/docker-compose
+	sudo usermod -aG docker $(USER)
 
 # https://github.com/foxlet/macOS-Simple-KVM
 macos:
@@ -49,7 +54,11 @@ nodenv:
 	curl -fsSL https://raw.githubusercontent.com/nodenv/nodenv-installer/master/bin/nodenv-installer | bash
 
 # system settings
-conf: dconf gdm3 deepsleep ssh gpg x11 wayland-fractional
+conf: dconf gdm3 deepsleep ssh gpg x11 wayland-fractional acpi
+
+acpi:
+	sudo ln -svf $(ROOT_DIR)/conf/etc/acpi/events/lineout /etc/acpi/events/lineout 
+	sudo ln -svf $(ROOT_DIR)/sbin/pactl-reset.sh /usr/local/sbin/pactl-reset.sh
 
 wayland-fractional:
 	gsettings set org.gnome.mutter experimental-features "['scale-monitor-framebuffer']"

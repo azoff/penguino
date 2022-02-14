@@ -1,0 +1,2 @@
+event=jack/lineout.*
+action=/usr/local/sbin/pactl-reset.sh "%e" 
