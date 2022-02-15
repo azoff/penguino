@@ -94,7 +94,10 @@ gdm3:
 	sudo ln -svf $(ROOT_DIR)/conf/etc/gdm3/custom.conf /etc/gdm3/custom.conf
 
 # debian packages
-apts: apt-setup snapd dropbox 1password copyq zoom zsh git guake chrome-gnome-shell
+apts: apt-setup snapd dropbox 1password copyq zoom zsh git guake chrome-gnome-shell open-jdk-11
+
+open-jdk-11:
+	sudo apt install openjdk-11-jdk
 
 chrome-gnome-shell:
 	sudo apt install chrome-gnome-shell
