@@ -80,3 +80,5 @@
 	email = jon@sno.llc
 	signingkey = 62A2033292DB5CF1
 
+[init]
+	defaultBranch = main

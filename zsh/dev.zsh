@@ -1,5 +1,6 @@
 eval "$(nodenv init -)"
-export PATH="${PATH}:$(nodenv root)/versions/$(nodenv version-name)/bin" 
+
+export ANDROID_SDK_ROOT=~/Android/Sdk
 
 alias dcc='docker-compose'
 alias dcu='docker-compose up'

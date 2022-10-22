@@ -26,7 +26,7 @@ plugins=(git \
   # esc twice to retry with sudo \
 	sudo \
 	# pwd | pbcopy \
-	copydir \
+	copypath \
 	# cat file | pbcopy \
 	copyfile \
 	# ctrl+o to copy history to the clipboard	\
