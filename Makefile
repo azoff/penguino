@@ -5,7 +5,7 @@ ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 everything: conf apts flatpaks snaps dev
 
 # developer tools
-dev: nodenv python3 golang open zoom-launcher macos docker docker-compose
+dev: nodenv python3 golang open zoom-launcher qemu docker docker-compose
 
 kubectl:
 	sudo apt install -y kubectl
@@ -19,10 +19,12 @@ docker-compose:
 	sudo chmod +x /usr/local/bin/docker-compose
 	sudo usermod -aG docker $(USER)
 
-# https://github.com/foxlet/macOS-Simple-KVM
-macos:
-	git clone git@github.com:foxlet/macOS-Simple-KVM.git $(HOME)/Code/foxlet/macOS-Simple-KVM
-	sudo apt install -y qemu-system qemu-utils
+qemu:
+	sudo apt install -y qemu qemu-kvm libvirt-clients libvirt-daemon-system bridge-utils virt-manager libguestfs-tools
+	sudo systemctl enable --now libvirtd
+	sudo systemctl enable --now virtlogd
+	echo 1 | sudo tee /sys/module/kvm/parameters/ignore_msrs
+	sudo modprobe kvm
 
 open:
 	$(shell "[[ -f /usr/bin/open ]] && sudo mv -v /usr/bin/open /usr/bin/open-perl")
@@ -162,10 +164,7 @@ dropbox:
 	sudo apt install -y python3-gpg /tmp/dropbox.deb
 
 # complete, installable apps for pop_os
-flatpaks: spotify chromium slack vscode
-
-spotify:
-	flatpak install -y spotify
+flatpaks: chromium slack vscode
 	
 chromium:
 	flatpak install -y flathub org.chromium.Chromium
@@ -175,7 +174,7 @@ slack:
 	flatpak install -y flathub com.slack.Slack
 
 # complete, installable apps for ubuntu
-snaps: spt vscode mailspring whatsapp-for-linux thunderbird
+snaps: spt vscode spotify whatsapp-for-linux thunderbird
 
 # mail and calendar (lightning)
 thunderbird:
@@ -192,8 +191,8 @@ vscode:
 	sudo update-alternatives --set editor $(shell which code)
 
 # email client
-mailspring:
-	sudo snap install mailspring
+spotify:
+	sudo snap install spotify
 
 # spotify for terminal
 spt:

@@ -9,6 +9,7 @@ zsh/local.zsh
 # hide ssh keys and known hosts
 conf/.ssh/*_rsa*
 conf/.ssh/*_ed*
+conf/.ssh/*.pem
 conf/.ssh/known_hosts
 
 # hide the gpg db

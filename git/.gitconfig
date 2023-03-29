@@ -80,5 +80,10 @@
 	email = jon@sno.llc
 	signingkey = 62A2033292DB5CF1
 
+[user "postmodern.llc"]
+	name = Jonathan Azoff
+	email = jon@postmodern.llc
+	signingkey = A1DBBAD35587970A
+
 [init]
 	defaultBranch = main
