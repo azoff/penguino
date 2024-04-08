@@ -5,7 +5,7 @@ ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 everything: conf apts flatpaks snaps dev
 
 # developer tools
-dev: nodenv python3 golang open zoom-launcher qemu docker docker-compose
+dev: nodenv rbenv python3 golang open zoom-launcher qemu docker bun rust
 
 kubectl:
 	sudo apt install -y kubectl
@@ -14,10 +14,11 @@ docker:
 	sudo apt install -y docker-ce docker-ce-cli containerd.io
 	sudo setfacl --modify user:$(USER):rw /var/run/docker.sock 
 
-docker-compose:
-	sudo curl -L "https://github.com/docker/compose/releases/download/1.27.4/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-	sudo chmod +x /usr/local/bin/docker-compose
-	sudo usermod -aG docker $(USER)
+bun:
+	curl -fsSL https://bun.sh/install | bash
+
+rust:
+	curl https://sh.rustup.rs -sSf | sh
 
 qemu:
 	sudo apt install -y qemu qemu-kvm libvirt-clients libvirt-daemon-system bridge-utils virt-manager libguestfs-tools
@@ -54,6 +55,10 @@ python3:
 # allows for multiple node versions on the system
 nodenv:
 	curl -fsSL https://raw.githubusercontent.com/nodenv/nodenv-installer/master/bin/nodenv-installer | bash
+
+# allows for multiple ruby versions on the system
+rbenv:
+	curl -fsSL https://github.com/rbenv/rbenv-installer/raw/HEAD/bin/rbenv-installer | bash
 
 # system settings
 conf: dconf gdm3 deepsleep ssh gpg x11 wayland-fractional acpi
@@ -166,6 +171,9 @@ dropbox:
 # complete, installable apps for pop_os
 flatpaks: chromium slack vscode
 	
+spotify:
+	flatpak install -y flathub com.spotify.Client
+
 chromium:
 	flatpak install -y flathub org.chromium.Chromium
 	ln -svf $(ROOT_DIR)/conf/.var/app/org.chromium.Chromium/config/chromium-flags.conf $(HOME)/.var/app/org.chromium.Chromium/config/chromium-flags.conf
@@ -174,11 +182,11 @@ slack:
 	flatpak install -y flathub com.slack.Slack
 
 # complete, installable apps for ubuntu
-snaps: spt vscode spotify whatsapp-for-linux thunderbird
+snaps: spt vscode whatsapp-for-linux bluemail
 
 # mail and calendar (lightning)
-thunderbird:
-	sudo snap install thunderbird
+bluemail:
+	sudo snap install bluemail
 
 whatsapp-for-linux:
 	sudo snap install whatsapp-for-linux
@@ -189,10 +197,6 @@ vscode:
 	xdg-mime default code.desktop text/plain
 	sudo update-alternatives --install /usr/bin/editor editor $(shell which code) 10
 	sudo update-alternatives --set editor $(shell which code)
-
-# email client
-spotify:
-	sudo snap install spotify
 
 # spotify for terminal
 spt:
