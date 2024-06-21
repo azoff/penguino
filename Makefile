@@ -182,11 +182,11 @@ slack:
 	flatpak install -y flathub com.slack.Slack
 
 # complete, installable apps for ubuntu
-snaps: spt vscode whatsapp-for-linux bluemail
+snaps: spt vscode whatsapp-for-linux vivaldi
 
-# mail and calendar (lightning)
-bluemail:
-	sudo snap install bluemail
+# browser, mail and calendar (lightning)
+vivaldi:
+	sudo snap install vivaldi
 
 whatsapp-for-linux:
 	sudo snap install whatsapp-for-linux
