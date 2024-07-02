@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=com.github.hluk.copyq
+Exec=flatpak run com.github.hluk.copyq
+X-Flatpak=com.github.hluk.copyq
