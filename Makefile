@@ -5,14 +5,20 @@ ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 everything: conf apts flatpaks snaps dev
 
 # developer tools
-dev: nodenv rbenv python3 open docker bun rust
+dev: vscode nodenv rbenv python3 open docker bun rust
 
 kubectl:
 	sudo apt install -y kubectl
 
+
+# in case of kernel issues, update grub: 
+# https://github.com/docker/cli/issues/2104#issuecomment-1702319587 
 docker:
-	sudo apt install -y docker-ce docker-ce-cli containerd.io
-	sudo setfacl --modify user:$(USER):rw /var/run/docker.sock 
+	curl -fsSL https://get.docker.com | sudo sh
+	sudo groupadd docker
+	sudo usermod -aG docker $(USER)
+	newgrp docker
+	docker run --rm hello-world
 
 bun:
 	curl -fsSL https://bun.sh/install | bash
@@ -23,6 +29,13 @@ rust:
 open:
 	$(shell "[[ -f /usr/bin/open ]] && sudo mv -v /usr/bin/open /usr/bin/open-perl")
 	sudo ln -fsv $(shell which xdg-open) /usr/bin/open
+
+vscode:
+	curl -L 'https://code.visualstudio.com/sha/download?build=stable&os=linux-deb-x64' > ~/Downloads/vscode.deb
+	sudo dpkg -i ~/Downloads/vscode.deb 
+	xdg-mime default code.desktop text/plain
+	sudo update-alternatives --set editor /usr/bin/code
+	sudo update-alternatives --install /usr/bin/editor editor /usr/bin/code 10
 
 # https://community.frame.work/t/fingerprint-scanner-compatibility-with-linux-ubuntu-fedora-etc/1501/18
 fprintd:
@@ -97,18 +110,13 @@ dropbox:
 	sudo apt install -y python3-gpg /tmp/dropbox.deb
 
 # complete, installable apps for pop_os
-flatpaks: slack vscode copyq vivaldi whatsapp zoom
+flatpaks: slack copyq vivaldi whatsapp zoom
 
 zoom:
 	flatpak install -y us.zoom.Zoom
 
 copyq:
 	flatpak install -y com.github.hluk.copyq
-
-vscode:
-	flatpak install -y com.visualstudio.code
-	sudo update-alternatives --install /usr/bin/editor editor /var/lib/flatpak/exports/com.visualstudio.code 10
-	sudo update-alternatives --set editor /var/lib/flatpak/exports/com.visualstudio.code
 
 vivaldi:
 	flatpak install -y org.chromium.Chromium
@@ -120,7 +128,7 @@ whatsapp:
 	flatpak install -y io.github.mimbrero.WhatsAppDesktop
 
 # complete, installable apps for ubuntu
-snaps: mailspring spotify terminus
+snaps: mailspring spotify
 
 # email
 mailspring:
@@ -128,6 +136,3 @@ mailspring:
 
 spotify:
 	sudo snap install spotify
-
-terminus:
-	sudo snap install termius-beta
