@@ -5,11 +5,10 @@ ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 everything: conf apts flatpaks snaps dev
 
 # developer tools
-dev: vscode nodenv rbenv python3 open docker bun rust
+dev: vscode gh nodenv rbenv python3 open docker bun rust
 
 kubectl:
 	sudo apt install -y kubectl
-
 
 # in case of kernel issues, update grub: 
 # https://github.com/docker/cli/issues/2104#issuecomment-1702319587 
@@ -29,6 +28,9 @@ rust:
 open:
 	$(shell "[[ -f /usr/bin/open ]] && sudo mv -v /usr/bin/open /usr/bin/open-perl")
 	sudo ln -fsv $(shell which xdg-open) /usr/bin/open
+
+gh:
+	sudo apt install gh xclip
 
 vscode:
 	curl -L 'https://code.visualstudio.com/sha/download?build=stable&os=linux-deb-x64' > ~/Downloads/vscode.deb
@@ -106,7 +108,7 @@ snapd:
 	
 # dropbox file management
 dropbox:
-	curl -L https://www.dropbox.com/download?dl=packages/ubuntu/dropbox_2020.03.04_amd64.deb > /tmp/dropbox.deb
+	curl -L 'https://www.dropbox.com/download?dl=packages/ubuntu/dropbox_2024.04.17_amd64.deb' > /tmp/dropbox.deb
 	sudo apt install -y python3-gpg /tmp/dropbox.deb
 
 # complete, installable apps for pop_os

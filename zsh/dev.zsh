@@ -4,6 +4,11 @@ eval "$(nodenv init -)"
 # ruby
 eval "$(~/.rbenv/bin/rbenv init -)"
 
+# java
+[ -z "$JAVA_HOME" ] && \
+[ -x "$(command -v java)" ] && \
+export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
+
 # bun completions
 [ -s "/home/azoff/.bun/_bun" ] && source "/home/azoff/.bun/_bun"
 

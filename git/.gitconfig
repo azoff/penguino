@@ -104,6 +104,11 @@
 	email = jon@postmodern.llc
 	signingkey = A1DBBAD35587970A
 
+[user "cardless.com"]
+	name = Jonathan Azoff
+	email = jon@cardless.com
+	signingkey = A224DCF083A246C7
+
 [url "git@github.com:"]
 	insteadOf = "https://github.com/"
 
