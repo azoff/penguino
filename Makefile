@@ -76,7 +76,15 @@ autostart:
 	ln -svf $(ROOT_DIR)/conf/.config/autostart $(HOME)/.config/autostart
 
 # debian packages
-apts: apt-setup snapd dropbox 1password zsh git
+apts: apt-setup snapd dropbox 1password zsh git openssh-server
+
+# openssh server
+openssh-server:
+	sudo apt install -y openssh-server
+	sudo rm -rvf /etc/ssh/sshd_config
+	sudo ln -svf $(ROOT_DIR)/conf/openssh/sshd_config /etc/ssh/sshd_config
+	sudo systemctl enable ssh
+	sudo systemctl start ssh
 
 # git vcs config
 git:
