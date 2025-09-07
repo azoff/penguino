@@ -1,6 +1,3 @@
-# docs: https://github.com/geometry-zsh/geometry
-ZSH_THEME="geometry"
-
 # zsh history setup
 HISTFILE=${ZSH_HOME}/.histfile
 HISTSIZE=1000
@@ -20,7 +17,7 @@ DISABLE_MAGIC_FUNCTIONS="true"
 # lines are shown.
 PROMPT_EOL_MARK=
 
-plugins=(git \
+plugins=(
 	# autocomplete with tab outs \
 	zsh-autosuggestions \
   # esc twice to retry with sudo \
@@ -33,8 +30,6 @@ plugins=(git \
 	copybuffer \
 	# alt+horizontal for time, alt+vertical for folders \
 	dirhistory)
-
-source $ZSH/oh-my-zsh.sh
 
 GEOMETRY_STATUS_SYMBOL="•"             # default prompt symbol
 GEOMETRY_STATUS_SYMBOL_ERROR="•"       # displayed when exit value is != 0
@@ -55,3 +50,6 @@ function clear-scrollback-buffer {
 
 zle -N clear-scrollback-buffer
 bindkey '^L' clear-scrollback-buffer
+
+# enable starship
+eval "$(starship init zsh)"

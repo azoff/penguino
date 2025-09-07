@@ -5,10 +5,13 @@ ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 everything: conf apts flatpaks snaps dev
 
 # developer tools
-dev: vscode gh nvm rbenv python3 open docker bun rust
+dev: vscode gh nvm rbenv python3 open docker bun rust kubectl pyenv starship
 
-kubectl:
-	sudo apt install -y kubectl
+starship:
+	curl -sS https://starship.rs/install.sh | sh
+
+pyenv:
+	curl https://pyenv.run | bash
 
 # in case of kernel issues, update grub: 
 # https://github.com/docker/cli/issues/2104#issuecomment-1702319587 
@@ -141,10 +144,12 @@ whatsapp:
 	flatpak install -y io.github.mimbrero.WhatsAppDesktop
 
 # complete, installable apps for ubuntu
-snaps: mailspring kubectl
+snaps: mailspring
 
 kubectl:
-	sudo snap install kubectl --classic
+	curl -LO "https://dl.k8s.io/release/v1.26.14/bin/linux/amd64/kubectl"
+	sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+	rm -f kubectl
 
 # email
 mailspring:
