@@ -5,10 +5,16 @@ ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 everything: conf apts flatpaks snaps dev
 
 # developer tools
-dev: vscode gh nvm rbenv python3 open docker bun rust kubectl pyenv starship
+dev: vscode gh nvm rbenv python3 open docker bun rust kubectl pyenv starship nerd-fonts
 
 starship:
 	curl -sS https://starship.rs/install.sh | sh
+	ln -s $(ROOT_DIR)/conf/.config/starship.toml $(HOME)/.config/starship.toml
+
+nerd-fonts:
+	curl -L 'https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/0xProto.zip' > ~/Downloads/0xProto.zip
+	unzip ~/Downloads/0xProto.zip -d ~/.local/share/fonts
+	fc-cache -fv
 
 pyenv:
 	curl https://pyenv.run | bash
