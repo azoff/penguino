@@ -5,7 +5,7 @@ ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 everything: conf apts flatpaks snaps dev
 
 # developer tools
-dev: vscode gh nvm rbenv python3 open docker bun rust kubectl pyenv starship nerd-fonts
+dev: vscode gh nvm rbenv python3 open docker bun rust kubectl pyenv starship nerd-fonts claude oh-my-zsh
 
 starship:
 	curl -sS https://starship.rs/install.sh | sh
@@ -15,6 +15,9 @@ nerd-fonts:
 	curl -L 'https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/0xProto.zip' > ~/Downloads/0xProto.zip
 	unzip ~/Downloads/0xProto.zip -d ~/.local/share/fonts
 	fc-cache -fv
+
+claude:
+	curl -fsSL https://claude.ai/install.sh | bash
 
 pyenv:
 	curl https://pyenv.run | bash
@@ -85,7 +88,10 @@ autostart:
 	ln -svf $(ROOT_DIR)/conf/.config/autostart $(HOME)/.config/autostart
 
 # debian packages
-apts: apt-setup snapd dropbox 1password zsh git openssh-server awscli spotify
+apts: apt-setup snapd dropbox 1password zsh git openssh-server awscli copyq
+
+copyq:
+	sudo apt install -y copyq
 
 awscli:
 	sudo apt install -y awscli
@@ -102,6 +108,11 @@ openssh-server:
 git:
 	sudo apt install -y git git-lfs
 	ln -svf $(ROOT_DIR)/git/.gitconfig $(HOME)/.gitconfig
+
+oh-my-zsh:
+	sh -c "$$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+	git clone https://github.com/zsh-users/zsh-autosuggestions $(HOME)/.oh-my-zsh/custom/plugins/zsh-autosuggestions
+	git clone https://github.com/zsh-users/zsh-history-substring-search $(HOME)/.oh-my-zsh/custom/plugins/zsh-history-substring-search
 
 # a more modern shell
 zsh:
@@ -132,13 +143,10 @@ dropbox:
 	sudo apt install -y python3-gpg /tmp/dropbox.deb
 
 # complete, installable apps for pop_os
-flatpaks: slack copyq vivaldi whatsapp zoom
+flatpaks: slack vivaldi whatsapp zoom
 
 zoom:
 	flatpak install -y us.zoom.Zoom
-
-copyq:
-	flatpak install -y com.github.hluk.copyq
 
 vivaldi:
 	flatpak install -y org.chromium.Chromium
@@ -150,18 +158,14 @@ whatsapp:
 	flatpak install -y io.github.mimbrero.WhatsAppDesktop
 
 # complete, installable apps for ubuntu
-snaps: mailspring
+snaps: spotify
+
+spotify:
+	sudo snap install spotify
 
 kubectl:
 	curl -LO "https://dl.k8s.io/release/v1.26.14/bin/linux/amd64/kubectl"
 	sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 	rm -f kubectl
 
-# email
-mailspring:
-	sudo snap install mailspring
 
-spotify:
-	curl -sS https://download.spotify.com/debian/pubkey_C85668DF69375001.gpg | sudo gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/spotify.gpg
-	echo "deb https://repository.spotify.com stable non-free" | sudo tee /etc/apt/sources.list.d/spotify.list
-	sudo apt-get update && sudo apt-get install -y spotify-client

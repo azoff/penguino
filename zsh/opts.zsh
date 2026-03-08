@@ -8,3 +8,7 @@ setopt extendedglob
 setopt nomatch 
 # report on bg jobs immediately
 setopt notify
+# ignore duplicate entries in history
+setopt hist_ignore_all_dups
+# share history between sessions
+setopt share_history

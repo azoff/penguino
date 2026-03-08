@@ -40,3 +40,10 @@ fi
 if [ -d "$HOME/.local/bin" ] ; then
     export PATH="$HOME/.local/bin:$PATH"
 fi
+
+# claude cli
+ask() {
+    local session_name="ask-$(hostname)"
+    local session_id=$(echo -n "$session_name" | md5sum | sed 's/^\(.\{8\}\)\(.\{4\}\)\(.\{4\}\)\(.\{4\}\)\(.\{12\}\).*/\1-\2-\3-\4-\5/')
+    claude -p --resume "$session_id" "$*"
+}
