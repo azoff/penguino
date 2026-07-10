@@ -118,3 +118,13 @@
 
 [tag]
 	sort = taggerdate
+[user]
+	name = kernelbot
+	email = bot@kernelbot.local
+[safe]
+	directory = /home/azoff/Code/azoff/kernelbot
+	directory = /home/azoff/Code/azoff/kernelbot
+	directory = /home/azoff/Code/azoff/kernelbot
+	directory = /home/azoff/Code/azoff/kernelbot
+	directory = /home/azoff/Code/azoff/kernelbot
+	directory = /home/azoff/Code/azoff/kernelbot
