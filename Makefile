@@ -93,7 +93,7 @@ apts: apt-setup snapd dropbox 1password zsh git openssh-server awscli copyq
 copyq:
 	sudo add-apt-repository -y ppa:hluk/copyq
 	sudo apt update
-	sudo apt install -y copyq copyq-plugins
+	sudo apt install -y copyq
 
 awscli:
 	sudo apt install -y awscli
