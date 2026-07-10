@@ -91,7 +91,9 @@ autostart:
 apts: apt-setup snapd dropbox 1password zsh git openssh-server awscli copyq
 
 copyq:
-	sudo apt install -y copyq
+	sudo add-apt-repository -y ppa:hluk/copyq
+	sudo apt update
+	sudo apt install -y copyq copyq-plugins
 
 awscli:
 	sudo apt install -y awscli
