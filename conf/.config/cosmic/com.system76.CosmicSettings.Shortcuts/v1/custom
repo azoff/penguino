@@ -1,0 +1,4 @@
+{
+    (modifiers: [Super, Alt], key: "v"): Spawn("copyq menu"),
+    (modifiers: [Super], key: "v"): Spawn("copyq toggle"),
+}

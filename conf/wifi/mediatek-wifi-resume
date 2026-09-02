@@ -1,0 +1,12 @@
+#!/bin/sh
+# Work around mt7921e/iwd failing to recover after suspend:
+# after resume iwd logs "Could not register frame watch type 00d0: -114"
+# and wifi scans return nothing until the driver and iwd are reset.
+# The actual fix runs detached via systemd-run so resume isn't blocked
+# and the fix can wait, verify, and retry (see wifi-resume-fix).
+case "$1" in
+    post)
+        systemd-run --collect --description="WiFi resume fix (mt7921e/iwd)" \
+            /usr/local/sbin/wifi-resume-fix
+        ;;
+esac

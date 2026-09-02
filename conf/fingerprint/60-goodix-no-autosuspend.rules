@@ -1,0 +1,5 @@
+# Keep the Goodix fingerprint reader (Framework 13) always powered.
+# With USB autosuspend (the default, 2s delay), the reader resets when
+# fprintd wakes it, verify fails with "device was disconnected", and the
+# fingerprint prompt at the COSMIC greeter vanishes after ~1 second.
+SUBSYSTEM=="usb", ATTR{idVendor}=="27c6", ATTR{idProduct}=="609c", ATTR{power/control}="on"

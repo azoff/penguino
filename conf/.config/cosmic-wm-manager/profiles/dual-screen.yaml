@@ -1,0 +1,72 @@
+name: dual-screen
+description: "Laptop + external LG DualUp (ported from AWSM 'dual screen' session)"
+
+# Workspace index mapping (ProfileConfig.resolve_workspace_output walks monitors
+# in order): ws1 -> DVI-I-1, ws2-3 -> eDP-1. If the DualUp is ever connected
+# directly instead of via the DisplayLink dock, update its output name here
+# (check `cosmic-randr list`).
+monitors:
+  - output: "DVI-I-1"
+    primary: true
+    workspace_count: 1
+  - output: "eDP-1"
+    workspace_count: 2
+
+# NOTE: Vivaldi PWA windows get per-app Wayland app_ids matching their
+# desktop entries (vivaldi-<host>__<path>-Default) — match rules must use
+# those or cosmic-wm relaunches already-open windows and can't place them.
+# PWAs launch via gtk-launch so the desktop entries (which carry the
+# vivaldi-apps --user-data-dir and link-out extension flags) stay the
+# single source of truth.
+apps:
+  # external monitor (DVI-I-1): main work surface
+  - command: "vivaldi"
+    workspace: 1
+    match:
+      class: "vivaldi-stable"
+  - command: "gtk-launch vivaldi-calendar.vimcal.com__-Default"  # Vimcal
+    workspace: 1
+    match:
+      class: "vivaldi-calendar.vimcal.com__-Default"
+    state:
+      - maximized
+  - command: "gtk-launch vivaldi-ticktick.com__webapp-Default"  # TickTick
+    workspace: 1
+    match:
+      class: "vivaldi-ticktick.com__webapp-Default"
+  - command: "flatpak run us.zoom.Zoom"
+    workspace: 1
+    match:
+      class: "us.zoom.Zoom"
+
+  # laptop screen (eDP-1, first workspace): comms
+  - command: "gtk-launch vivaldi-claude.ai__-Default"  # Claude
+    workspace: 2
+    match:
+      class: "vivaldi-claude.ai__-Default"
+  - command: "gtk-launch vivaldi-mail.missiveapp.com__-Default"  # Missive
+    workspace: 2
+    match:
+      class: "vivaldi-mail.missiveapp.com__-Default"
+  - command: "flatpak run com.slack.Slack"
+    workspace: 2
+    match:
+      class: "com.slack.Slack"
+  - command: "flatpak run org.signal.Signal"
+    workspace: 2
+    match:
+      class: "org.signal.Signal"
+  - command: "flatpak run io.github.mimbrero.WhatsAppDesktop"
+    workspace: 2
+    match:
+      class: "io.github.mimbrero.WhatsAppDesktop"
+  - command: "spotify"
+    workspace: 2
+    match:
+      class: "Spotify"
+
+  # laptop screen, second workspace
+  - command: "cosmic-term"
+    workspace: 3
+    match:
+      class: "com.system76.CosmicTerm"

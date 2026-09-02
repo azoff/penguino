@@ -4,6 +4,22 @@ ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
 everything: conf apts flatpaks snaps dev
 
+# one-time repair for the 22.04 -> 24.04 upgrade, which disabled third-party
+# apt repos and removed/downgraded their packages (also rerun `make docker`
+# separately -- it drops into an interactive newgrp shell)
+popos24: vivaldi 1password copyq displaylink zoom cosmic-wm
+
+# window session save/restore for COSMIC (replaces GNOME's Another Window
+# Session Manager extension); profiles live in conf/
+cosmic-wm:
+	sudo apt install -y python3-venv
+	git clone https://github.com/Izume01/cosmic-ext-wm-manager $(HOME)/Code/Izume01/cosmic-ext-wm-manager 2>/dev/null || true
+	cd $(HOME)/Code/Izume01/cosmic-ext-wm-manager && ./install.sh -y
+	mkdir -p $(HOME)/.config/cosmic-wm-manager/sessions
+	rm -rf $(HOME)/.config/cosmic-wm-manager/profiles
+	ln -svf $(ROOT_DIR)/conf/.config/cosmic-wm-manager/profiles $(HOME)/.config/cosmic-wm-manager/profiles
+	$(HOME)/.local/bin/cosmic-wm autostart --enable
+
 # developer tools
 dev: vscode gh nvm rbenv python3 open docker bun rust kubectl pyenv starship nerd-fonts claude oh-my-zsh
 
@@ -56,6 +72,12 @@ fprintd:
 	sudo apt install fprintd libpam-fprintd gettext gtk-doc-tools libfprint-2-dev libgirepository1.0-dev libgusb-dev libpam-wrapper libpam0g-dev libpamtest0-dev libpolkit-gobject-1-dev libsystemd-dev libdbus-1-dev libxml2-utils python3-pypamtest
 	pip install ninja gobject python-dbusmock meson
 	sudo pam-auth-update
+	sudo ln -svf $(ROOT_DIR)/conf/fingerprint/60-goodix-no-autosuspend.rules /etc/udev/rules.d/60-goodix-no-autosuspend.rules
+	sudo udevadm control --reload && sudo udevadm trigger --subsystem-match=usb --attr-match=idVendor=27c6
+
+# fingerprint at lock screen + sudo only, never at initial login (keyring)
+fingerprint-pam:
+	sudo sh $(ROOT_DIR)/conf/fingerprint/install-fingerprint-pam.sh
 
 python3:
 	sudo apt install -y python3
@@ -88,19 +110,72 @@ autostart:
 	ln -svf $(ROOT_DIR)/conf/.config/autostart $(HOME)/.config/autostart
 
 # debian packages
-apts: apt-setup snapd dropbox 1password zsh git openssh-server awscli copyq
+apts: apt-setup snapd dropbox 1password zsh git openssh-server awscli copyq vivaldi displaylink
 
-copyq:
+# global shortcuts live in the compositor on COSMIC/Wayland (apps can't grab keys)
+copyq: cosmic-shortcuts
 	sudo add-apt-repository -y ppa:hluk/copyq
 	sudo apt update
 	sudo apt install -y copyq
-	gsettings set org.gnome.settings-daemon.plugins.media-keys custom-keybindings "['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/']"
-	gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/ name 'CopyQ tray menu'
-	gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/ binding '<Super><Alt>v'
-	gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/ command 'copyq menu'
+
+# COSMIC custom keybindings (Super+Alt+V copyq menu, Super+V copyq toggle)
+cosmic-shortcuts:
+	mkdir -p $(HOME)/.config/cosmic/com.system76.CosmicSettings.Shortcuts/v1
+	ln -svf $(ROOT_DIR)/conf/.config/cosmic/com.system76.CosmicSettings.Shortcuts/v1/custom $(HOME)/.config/cosmic/com.system76.CosmicSettings.Shortcuts/v1/custom
+
+# DisplayLink driver for USB docking station video (evdi dkms module)
+displaylink:
+	curl -L 'https://www.synaptics.com/sites/default/files/Ubuntu/pool/stable/main/all/synaptics-repository-keyring.deb' > /tmp/synaptics-keyring.deb
+	sudo apt install -y /tmp/synaptics-keyring.deb
+	sudo apt update
+	sudo apt install -y displaylink-driver
 
 awscli:
 	sudo apt install -y awscli
+
+# recover mt7921e wifi + supplicant after s2idle resume (scans stay empty otherwise)
+wifi-resume-fix:
+	sudo ln -svf $(ROOT_DIR)/conf/wifi/wifi-resume-fix /usr/local/sbin/wifi-resume-fix
+	sudo ln -svf $(ROOT_DIR)/conf/wifi/mediatek-wifi-resume /usr/lib/systemd/system-sleep/mediatek-wifi-resume
+
+# gopro-as-webcam script (upstream copy, default resolution patched to 720)
+gopro:
+	sudo ln -svf $(ROOT_DIR)/conf/gopro/gopro /usr/local/sbin/gopro
+
+# Vivaldi/Chromium segfaults probing uvcvideo *metadata* nodes (laptop camera
+# video1) during getUserMedia -- hide them from user apps via udev
+uvc-metadata-fix:
+	sudo ln -svf $(ROOT_DIR)/conf/camera/60-uvc-metadata-hide.rules /etc/udev/rules.d/60-uvc-metadata-hide.rules
+	sudo udevadm control --reload
+	sudo udevadm trigger --subsystem-match=video4linux
+
+# PWAs run in a separate vivaldi instance (~/.config/vivaldi-apps) so launch
+# order can't disable main-browser extensions; this wires up the link-out
+# extension so external links clicked in a PWA open in main Vivaldi instead
+# of a vanilla window of the apps instance
+vivaldi-pwa-linkout:
+	chmod +x $(ROOT_DIR)/conf/vivaldi/linkout-host $(ROOT_DIR)/conf/vivaldi/install-linkout.sh
+	$(ROOT_DIR)/conf/vivaldi/install-linkout.sh
+
+# force Zoom P4 as default audio sink/source whenever it appears; wireplumber's
+# name-based memory misses when the dock re-enumerates the P4 under a suffixed
+# node name, so a watcher re-applies the defaults on hotplug events
+zoom-p4-audio:
+	mkdir -p $(HOME)/.config/wireplumber/wireplumber.conf.d $(HOME)/.config/systemd/user $(HOME)/.local/bin
+	ln -svf $(ROOT_DIR)/conf/audio/60-zoom-p4-priority.conf $(HOME)/.config/wireplumber/wireplumber.conf.d/60-zoom-p4-priority.conf
+	ln -svf $(ROOT_DIR)/conf/audio/zoom-p4-audio-watch $(HOME)/.local/bin/zoom-p4-audio-watch
+	ln -svf $(ROOT_DIR)/conf/audio/zoom-p4-audio.service $(HOME)/.config/systemd/user/zoom-p4-audio.service
+	systemctl --user daemon-reload
+	systemctl --user enable zoom-p4-audio.service
+	systemctl --user restart wireplumber zoom-p4-audio.service
+
+# NM wifi backend (wpa_supplicant; see conf/wifi/wifi-backend.conf for history)
+# iwd is masked so nothing (dbus activation, stale scripts) can start it and
+# fight wpa_supplicant for the interface. `systemctl unmask iwd` if reverting.
+wifi-backend:
+	sudo ln -svf $(ROOT_DIR)/conf/wifi/wifi-backend.conf /etc/NetworkManager/conf.d/wifi-backend.conf
+	sudo systemctl mask --now iwd
+	sudo systemctl restart NetworkManager
 
 # openssh server
 openssh-server:
@@ -129,8 +204,13 @@ zsh:
 
 
 1password:
-	curl -L https://downloads.1password.com/linux/debian/amd64/stable/1password-latest.deb > /tmp/1password.deb
-	sudo apt install -y /tmp/1password.deb
+	curl -sS https://downloads.1password.com/linux/keys/1password.asc | gpg --dearmor | sudo tee /usr/share/keyrings/1password-archive-keyring.gpg > /dev/null
+	echo "deb [arch=amd64 signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/amd64 stable main" | sudo tee /etc/apt/sources.list.d/1password.list
+	sudo apt update
+	sudo apt install -y 1password
+	# trust Vivaldi for browser-extension integration (package upgrades reset this
+	# file to the stock all-comments template, which makes the extension spin forever)
+	grep -qx vivaldi-bin /etc/1password/custom_allowed_browsers 2>/dev/null || echo vivaldi-bin | sudo tee -a /etc/1password/custom_allowed_browsers > /dev/null
 
 # gets apt ready to go
 apt-setup:
@@ -149,14 +229,21 @@ dropbox:
 	sudo apt install -y python3-gpg /tmp/dropbox.deb
 
 # complete, installable apps for pop_os
-flatpaks: slack vivaldi whatsapp zoom
+# user-scope installs: run make as your user, not via sudo (root has no remotes)
+flatpaks: flathub slack whatsapp zoom
 
-zoom:
-	flatpak install -y us.zoom.Zoom
+flathub:
+	flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+
+zoom: flathub
+	flatpak install --user -y flathub us.zoom.Zoom
 
 vivaldi:
-	flatpak install -y org.chromium.Chromium
-	
+	wget -qO- https://repo.vivaldi.com/archive/linux_signing_key.pub | gpg --dearmor | sudo tee /usr/share/keyrings/vivaldi-browser.gpg > /dev/null
+	echo "deb [signed-by=/usr/share/keyrings/vivaldi-browser.gpg arch=amd64] https://repo.vivaldi.com/archive/deb/ stable main" | sudo tee /etc/apt/sources.list.d/vivaldi.list
+	sudo apt update
+	sudo apt install -y vivaldi-stable
+
 slack:
 	flatpak install -y com.slack.Slack
 

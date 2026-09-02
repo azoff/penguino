@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Make the Zoom P4 the default audio sink/source whenever it (re)appears.
+# WirePlumber's name-based memory misses when the dock re-enumerates the P4
+# under a suffixed node name, so this enforces the choice on hotplug events.
+set -u
+
+apply() {
+    local sink source
+    sink=$(pactl list sinks short | awk '/ZOOM_P4_Audio/ {print $2; exit}')
+    if [ -n "$sink" ] && [ "$(pactl get-default-sink)" != "$sink" ]; then
+        pactl set-default-sink "$sink" && echo "default sink -> $sink"
+    fi
+    source=$(pactl list sources short | awk '/ZOOM_P4_Audio/ && !/\.monitor/ {print $2; exit}')
+    if [ -n "$source" ] && [ "$(pactl get-default-source)" != "$source" ]; then
+        pactl set-default-source "$source" && echo "default source -> $source"
+    fi
+}
+
+apply
+pactl subscribe | while read -r line; do
+    case "$line" in
+        # Only react to devices appearing (or server restart), so a manual
+        # pick of another output later in the session is left alone.
+        "Event 'new' on sink"*|"Event 'new' on source"*|"Event 'change' on server"*)
+            sleep 1  # let the node finish initializing
+            apply
+            ;;
+    esac
+done

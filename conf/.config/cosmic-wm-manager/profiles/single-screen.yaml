@@ -1,0 +1,41 @@
+name: single-screen
+description: "Laptop only (ported from AWSM 'single screen' session)"
+
+monitors:
+  - output: "eDP-1"
+    primary: true
+    workspace_count: 2
+
+apps:
+  - command: "vivaldi"
+    workspace: 1
+    match:
+      class: "vivaldi-stable"
+  - command: "gtk-launch vivaldi-claude.ai__-Default"  # Claude
+    workspace: 1
+    match:
+      class: "vivaldi-claude.ai__-Default"
+  - command: "gtk-launch vivaldi-mail.missiveapp.com__-Default"  # Missive
+    workspace: 1
+    match:
+      class: "vivaldi-mail.missiveapp.com__-Default"
+  - command: "gtk-launch vivaldi-calendar.vimcal.com__-Default"  # Vimcal
+    workspace: 1
+    match:
+      class: "vivaldi-calendar.vimcal.com__-Default"
+  - command: "gtk-launch vivaldi-ticktick.com__webapp-Default"  # TickTick
+    workspace: 1
+    match:
+      class: "vivaldi-ticktick.com__webapp-Default"
+  - command: "flatpak run com.slack.Slack"
+    workspace: 1
+    match:
+      class: "com.slack.Slack"
+  - command: "spotify"
+    workspace: 1
+    match:
+      class: "Spotify"
+  - command: "cosmic-term"
+    workspace: 2
+    match:
+      class: "com.system76.CosmicTerm"

@@ -1,0 +1,41 @@
+#!/bin/sh
+# Recover mt7921e + iwd after suspend (Framework/MT7922 resume bug).
+# Unlike a bare reload, this verifies scanning actually works and
+# retries, since the reload can silently fail right after resume
+# while the PCI device is still busy.
+log() { logger -t wifi-resume-fix "$*"; }
+
+# restart whichever supplicant NetworkManager is configured to use
+if grep -qs "wifi.backend=iwd" /etc/NetworkManager/conf.d/*.conf; then
+    SUPPLICANT=iwd.service
+else
+    SUPPLICANT=wpa_supplicant.service
+    # a stray iwd instance fights wpa_supplicant for the interface
+    # (caused the 2026-08-13 "auth request to the driver failed" outage)
+    systemctl stop iwd.service 2>/dev/null || true
+fi
+
+sleep 5  # let PCI resume and NetworkManager settle
+
+for attempt in 1 2 3; do
+    if [ "$attempt" -gt 1 ] || ! nmcli -t -f SSID dev wifi list --rescan yes 2>/dev/null | grep -q .; then
+        log "attempt $attempt: reloading mt7921e and restarting $SUPPLICANT"
+        systemctl stop "$SUPPLICANT"
+        if ! modprobe -r mt7921e 2>/dev/null; then
+            log "modprobe -r busy, waiting 3s"
+            sleep 3
+            modprobe -r mt7921e || log "modprobe -r failed twice"
+        fi
+        sleep 1
+        modprobe mt7921e
+        systemctl start "$SUPPLICANT"
+        sleep 7
+    fi
+    if nmcli -t -f SSID dev wifi list 2>/dev/null | grep -q .; then
+        log "wifi scanning OK after attempt $attempt"
+        exit 0
+    fi
+done
+
+log "wifi still not scanning after 3 attempts; manual reload_wifi_driver needed"
+exit 1

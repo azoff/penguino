@@ -1,0 +1,21 @@
+name: video-editing
+description: "Video editing (ported from AWSM 'video editing' session)"
+
+monitors:
+  - output: "eDP-1"
+    primary: true
+    workspace_count: 2
+
+apps:
+  - command: "cosmic-term"
+    workspace: 1
+    match:
+      class: "com.system76.CosmicTerm"
+  - command: "vivaldi"
+    workspace: 1
+    match:
+      class: "vivaldi-stable"
+  - command: "flatpak run org.kde.kdenlive"
+    workspace: 2
+    match:
+      class: "org.kde.kdenlive"

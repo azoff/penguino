@@ -1,0 +1,7 @@
+#!/bin/sh
+# Used by /etc/pam.d/cosmic-greeter to tell UNLOCK apart from INITIAL LOGIN:
+# exits 0 iff $PAM_USER already has a logind session. On initial login we skip
+# the fingerprint prompt so the password is entered and unlocks the keyring;
+# on lock-screen unlock the session exists and fingerprint is offered.
+[ -n "$PAM_USER" ] || exit 1
+loginctl list-sessions --no-legend 2>/dev/null | awk '{print $3}' | grep -qx -- "$PAM_USER"

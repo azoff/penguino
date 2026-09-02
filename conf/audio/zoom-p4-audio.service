@@ -1,0 +1,12 @@
+[Unit]
+Description=Force Zoom P4 as default audio when connected
+After=pipewire.service wireplumber.service pipewire-pulse.service
+Wants=pipewire-pulse.service
+
+[Service]
+ExecStart=%h/.local/bin/zoom-p4-audio-watch
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

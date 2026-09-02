@@ -1,0 +1,7 @@
+# uvcvideo METADATA nodes (ID_V4L_CAPABILITIES=":" -- no capture capability)
+# crash Vivaldi/Chromium with SIGSEGV during camera device probing (V4L2
+# control/format race on the node, observed with the laptop camera 0bda:5634
+# exposing video0=capture + video1=metadata). Hiding the metadata node from
+# user apps makes browsers skip it; real capture nodes are untouched and
+# nothing in userspace needs uvc metadata.
+SUBSYSTEM=="video4linux", ENV{ID_USB_DRIVER}=="uvcvideo", ENV{ID_V4L_CAPABILITIES}==":", MODE="0000"
