@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "PWA Router",
+  "version": "1.3",
+  "description": "Send Missive links into the Missive app window; fold command-line URL windows into the main window; reap dead tabs left by custom-scheme launches",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1p4lSIR21HvaMK/c91N+MfgnDV419xCrALoqsWDj9SUL9XofOitdDo5RIjgRNwc9stZIpDBvYPP+ezbdwbOpPV4yrGRuTn2ztOKr7lsxvzIcheGVXAshPdaUwRRUyi3dnAaAh04K9SvJm8S1+xUtpeO3xpjumWKRzUps+KrVhlioGznx4Op9/oHIRhtBIfBDonjwrV9x/2TMy6BjaKn0sa006rw74JcDkvop9ZxPZs8BGrNj1mdd7IT9jHuYp3Ijt6puC99z6VChHNLcfehwnZSkXWD4gZWMfB8FfIDc0rlGgzkflH9X/jcbzUT4TEoWCkyjP465tI9xdqP919qFmwIDAQAB",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": [
+    "tabs",
+    "storage"
+  ]
+}

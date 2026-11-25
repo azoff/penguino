@@ -1,0 +1,8 @@
+[Desktop Entry]
+Version=1.0
+Terminal=false
+Type=Application
+Name=Vimcal
+Exec=/opt/vivaldi/vivaldi --load-extension=/home/azoff/Code/azoff/penguino/conf/vivaldi/pwa-router,/home/azoff/Code/azoff/penguino/conf/vivaldi/missive-solo --app=https://calendar.vimcal.com/
+Icon=vivaldi-apghjmmingdpkjhepojeohcbngojblpk-Default
+StartupWMClass=vivaldi-calendar.vimcal.com__-Default

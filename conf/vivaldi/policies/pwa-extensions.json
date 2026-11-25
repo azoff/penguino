@@ -1,0 +1,25 @@
+{
+  "ExtensionSettings": {
+    "*": {
+      "runtime_blocked_hosts": [
+        "*://calendar.vimcal.com",
+        "*://mail.missiveapp.com",
+        "*://*.ticktick.com",
+        "*://*.spikenow.com"
+      ]
+    },
+    "aeblfdkhhhdcdjpifhhbdiojplfjncoa": {
+      "runtime_allowed_hosts": [
+        "*://calendar.vimcal.com",
+        "*://mail.missiveapp.com",
+        "*://*.ticktick.com",
+        "*://*.spikenow.com"
+      ]
+    },
+    "cbjoajbeidgmofplkblegngmmimfcenl": {
+      "runtime_allowed_hosts": [
+        "*://mail.missiveapp.com"
+      ]
+    }
+  }
+}

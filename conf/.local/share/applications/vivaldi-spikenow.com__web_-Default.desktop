@@ -1,0 +1,8 @@
+[Desktop Entry]
+Version=1.0
+Terminal=false
+Type=Application
+Name=Spike
+Exec=/opt/vivaldi/vivaldi --load-extension=/home/azoff/Code/azoff/penguino/conf/vivaldi/pwa-router,/home/azoff/Code/azoff/penguino/conf/vivaldi/missive-solo --app=https://spikenow.com/web/
+Icon=vivaldi-emldofgbopmlaimkbbfnionhnagimknj-Default
+StartupWMClass=vivaldi-spikenow.com__web_-Default

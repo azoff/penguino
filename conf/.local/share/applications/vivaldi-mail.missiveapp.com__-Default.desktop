@@ -1,0 +1,8 @@
+[Desktop Entry]
+Version=1.0
+Terminal=false
+Type=Application
+Name=Missive
+Exec=/opt/vivaldi/vivaldi --load-extension=/home/azoff/Code/azoff/penguino/conf/vivaldi/pwa-router,/home/azoff/Code/azoff/penguino/conf/vivaldi/missive-solo --app=https://mail.missiveapp.com/
+Icon=vivaldi-ajfammjbnehjkiikmnkfncjbljclabmd-Default
+StartupWMClass=vivaldi-mail.missiveapp.com__-Default

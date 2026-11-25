@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=CopyQ: clipboard menu
+Comment=Open the CopyQ clipboard menu at the pointer (bound to Meta+Alt+V by make plasma-shortcuts)
+Exec=copyq menu
+Icon=copyq
+Terminal=false
+NoDisplay=true
+StartupNotify=false
+X-KDE-Shortcuts=Meta+Alt+V

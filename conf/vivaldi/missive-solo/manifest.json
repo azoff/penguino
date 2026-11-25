@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Missive Solo",
+  "version": "1.1",
+  "description": "Single-user Missive: Forward/Reply always pick \"In this conversation\" (hold Alt to get the menu)",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsoS5MqYW8MwyZtzS6HLcAmcQP4QoVbxKwP4ohp0+PznrFADW3q6V0di/46uQ3q9y3+9AwxoMoUGeqFkbBC/yUcewWw5XAwSYtADxL/POXST2FOLT2QrZYM0kL6uJ4e3a9g3EbVPELnDjHn3mFI7h+6ru415aICRayFS1Wm4bNJWUwDpDUgCRwO2UyPkyb+eMMX+W/ingBt5gMCaLgtdBph2gW+/KReRe2vXgwsqoLNBGFRJoiYzGoXg26wWaGhsidjiWhZiR/w6bIfEyvrk+HwfesLo5b879jJMyWka3wgICR84NOOY7KAd+fpMmZZqXSS4v/sD00u0RJyGUeO6SfwIDAQAB",
+  "content_scripts": [
+    {
+      "matches": ["https://mail.missiveapp.com/*"],
+      "js": ["solo.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

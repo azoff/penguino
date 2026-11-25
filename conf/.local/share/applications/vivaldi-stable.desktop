@@ -1,0 +1,23 @@
+[Desktop Entry]
+# Overrides the packaged entry: adds --load-extension so the pwa-router is
+# present no matter which launcher starts the instance first.
+Version=1.0
+Name=Vivaldi
+GenericName=Web Browser
+Comment=Access the Internet
+Exec=/usr/bin/vivaldi-stable --load-extension=/home/azoff/Code/azoff/penguino/conf/vivaldi/pwa-router,/home/azoff/Code/azoff/penguino/conf/vivaldi/missive-solo %U
+StartupNotify=true
+Terminal=false
+Icon=vivaldi
+Type=Application
+Categories=Network;WebBrowser;
+MimeType=application/pdf;application/rdf+xml;application/rss+xml;application/xhtml+xml;application/xhtml_xml;application/xml;image/gif;image/jpeg;image/png;image/webp;text/html;text/xml;x-scheme-handler/http;x-scheme-handler/https;
+Actions=new-window;new-private-window;
+
+[Desktop Action new-window]
+Name=New Window
+Exec=/usr/bin/vivaldi-stable --load-extension=/home/azoff/Code/azoff/penguino/conf/vivaldi/pwa-router,/home/azoff/Code/azoff/penguino/conf/vivaldi/missive-solo --new-window
+
+[Desktop Action new-private-window]
+Name=New Private Window
+Exec=/usr/bin/vivaldi-stable --load-extension=/home/azoff/Code/azoff/penguino/conf/vivaldi/pwa-router,/home/azoff/Code/azoff/penguino/conf/vivaldi/missive-solo --incognito

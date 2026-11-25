@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+"""Pre-grant camera/mic permission to the PWA origins in a Vivaldi profile
+(default: the main profile; pass a user-data-dir to target another).
+
+Vivaldi 8.1's pre-permission media device prober has an fd race that
+segfaults the whole browser instance (observed as "Claude PWA auto-closes",
+taking every PWA window with it). Permission prompts never appear in app
+windows anyway, and a granted permission skips the crashing prober path
+entirely. Run while that Vivaldi instance is stopped.
+"""
+import json
+import sys
+from pathlib import Path
+
+DATA_DIR = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.home() / ".config/vivaldi"
+PREFS = DATA_DIR / "Default/Preferences"
+ORIGINS = [
+    "https://mail.missiveapp.com:443,*",
+    "https://calendar.vimcal.com:443,*",
+    "https://ticktick.com:443,*",
+    "https://spikenow.com:443,*",
+]
+
+if not PREFS.exists():
+    sys.exit(f"{PREFS} not found")
+
+p = json.loads(PREFS.read_text())
+exc = (
+    p.setdefault("profile", {})
+    .setdefault("content_settings", {})
+    .setdefault("exceptions", {})
+)
+for kind in ("media_stream_camera", "media_stream_mic"):
+    table = exc.setdefault(kind, {})
+    for origin in ORIGINS:
+        table[origin] = {"setting": 1}
+PREFS.write_text(json.dumps(p))
+print(f"granted camera+mic for {len(ORIGINS)} origins")

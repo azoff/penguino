@@ -4,4 +4,9 @@
 # exposing video0=capture + video1=metadata). Hiding the metadata node from
 # user apps makes browsers skip it; real capture nodes are untouched and
 # nothing in userspace needs uvc metadata.
-SUBSYSTEM=="video4linux", ENV{ID_USB_DRIVER}=="uvcvideo", ENV{ID_V4L_CAPABILITIES}==":", MODE="0000"
+#
+# Must be numbered >70: 70-uaccess.rules tags video4linux devices with
+# "uaccess", which makes logind grant the seated user an rw ACL that would
+# bypass MODE 0000. We strip the tag here; the Makefile target also clears
+# any ACL already present on the node.
+SUBSYSTEM=="video4linux", ENV{ID_USB_DRIVER}=="uvcvideo", ENV{ID_V4L_CAPABILITIES}==":", MODE="0000", GROUP="root", TAG-="uaccess"

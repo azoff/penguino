@@ -2,26 +2,129 @@
 
 ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
-everything: conf apts flatpaks snaps dev
+# assumes Pop!_OS 26.04 with KDE Plasma 6 as the desktop
+# desktop goes before apts so Plasma exists when copyq binds its shortcuts
+everything: conf desktop apts flatpaks snaps dev
 
-# one-time repair for the 22.04 -> 24.04 upgrade, which disabled third-party
-# apt repos and removed/downgraded their packages (also rerun `make docker`
-# separately -- it drops into an interactive newgrp shell)
-popos24: vivaldi 1password copyq displaylink zoom cosmic-wm
+# ---------------------------------------------------------------------------
+# Moving to Pop!_OS 26.04 by clean install (docs/pop26-plasma.md): snapshot
+# and back up here, wipe, restore home, then `make everything`.
+# ---------------------------------------------------------------------------
+POP26_DIR := $(HOME)/pop26-upgrade
+THIRD_PARTY_PKGS := vivaldi-stable 1password copyq displaylink-driver evdi claude-desktop code dropbox
 
-# window session save/restore for COSMIC (replaces GNOME's Another Window
-# Session Manager extension); profiles live in conf/
-cosmic-wm:
-	sudo apt install -y python3-venv
-	git clone https://github.com/Izume01/cosmic-ext-wm-manager $(HOME)/Code/Izume01/cosmic-ext-wm-manager 2>/dev/null || true
-	cd $(HOME)/Code/Izume01/cosmic-ext-wm-manager && ./install.sh -y
-	mkdir -p $(HOME)/.config/cosmic-wm-manager/sessions
-	rm -rf $(HOME)/.config/cosmic-wm-manager/profiles
-	ln -svf $(ROOT_DIR)/conf/.config/cosmic-wm-manager/profiles $(HOME)/.config/cosmic-wm-manager/profiles
-	$(HOME)/.local/bin/cosmic-wm autostart --enable
+# record what is installed (lands in home, so it travels with the backup):
+# a checklist of what to reinstall afterwards
+pop26-snapshot:
+	mkdir -p $(POP26_DIR)/sources.list.d
+	cp -a /etc/apt/sources.list.d/. $(POP26_DIR)/sources.list.d/
+	apt-mark showmanual | sort > $(POP26_DIR)/apt-manual.txt
+	dpkg-query -W -f='$${Package} $${Version}\n' $(THIRD_PARTY_PKGS) > $(POP26_DIR)/third-party.txt 2>/dev/null || true
+	flatpak list --app --columns=application,installation > $(POP26_DIR)/flatpaks.txt 2>/dev/null || true
+	snap list > $(POP26_DIR)/snaps.txt 2>/dev/null || true
+	ls /opt /usr/local/bin /usr/local/sbin > $(POP26_DIR)/opt-and-usr-local.txt 2>/dev/null || true
+	nmcli -t -f NAME,TYPE connection show > $(POP26_DIR)/network-connections.txt 2>/dev/null || true
+	@echo "snapshot written to $(POP26_DIR)"
+
+# Copy $HOME to an external drive: make pop26-backup DEST=/media/$(USER)/<drive>/home
+# Skips what a reinstall recreates: caches, the trash, rootless docker data
+# and user-scope flatpak apps (app *data* in ~/.var is kept). SKIP_DROPBOX=yes
+# also skips ~/Dropbox and its link state, for a clean re-sync from the cloud
+# (never restore the link state without the folder: Dropbox would treat the
+# missing files as deletions). Never deletes anything already in DEST.
+#
+# LEAN=yes also skips everything that re-downloads or rebuilds itself: IMAP
+# mail copies, the Android SDK/emulators/firmware images, Spotify's offline
+# cache, Claude desktop's VM bundle, package-manager caches and toolchains
+# (npm, yarn, gradle, nodenv, rustup, Cypress), VS Code extensions,
+# node_modules and Python venvs. EXTRA='--exclude=/some/path/' adds your own.
+BACKUP_LEAN := \
+	--exclude=/.var/app/eu.betterbird.Betterbird/.thunderbird/*/ImapMail/ --exclude=/.var/app/*/cache/ \
+	--exclude=/Android/Sdk/ --exclude=/.android/avd/ --exclude=/Code/android-root/ --exclude=/Code/android-studio/ \
+	--exclude=/snap/spotify/common/.cache/ \
+	--exclude=/.config/Claude/vm_bundles/ --exclude=/.config/Claude/Cache/ \
+	--exclude=/.npm/ --exclude=/.yarn/ --exclude=/.gradle/ --exclude=/.nodenv/ --exclude=/.rustup/ --exclude=/.config/Cypress/ \
+	--exclude=/.vscode/extensions/ --exclude=node_modules/ --exclude=.venv/ \
+	--exclude=/.var/app/com.vivaldi.Vivaldi/ --exclude=/.var/app/org.chromium.Chromium/ --exclude=/snap/chromium/
+# the last line above is data of browsers that are no longer installed
+# (dropped on purpose, 2026-11-25). ~/docker-volumes is a root-owned 2023
+# database volume a normal copy cannot read; skipped on purpose as well.
+BACKUP_EXCLUDES := --exclude=/.cache/ --exclude=/.local/share/Trash/ --exclude=/.local/share/docker/ --exclude=/.local/share/flatpak/ \
+	--exclude=/docker-volumes/ \
+	$(if $(filter yes,$(SKIP_DROPBOX)),--exclude=/Dropbox/ --exclude=/.dropbox/ --exclude=/.dropbox-dist/) \
+	$(if $(filter yes,$(LEAN)),$(BACKUP_LEAN)) $(EXTRA)
+
+# how big would the backup be with these options? (copies nothing)
+pop26-backup-size:
+	@mkdir -p $(POP26_DIR)/.size-probe
+	@rsync -aHAXn --stats $(BACKUP_EXCLUDES) $(HOME)/ $(POP26_DIR)/.size-probe/ | awk -F': ' '/^Total file size/{gsub(/[^0-9]/,"",$$2); printf "backup would be %.1f GB\n", $$2/1e9}'
+BACKUP_MUST_HAVE := Code/azoff/penguino/conf/.ssh/id_rsa Code/azoff/penguino/conf/.gnupg/pubring.kbx Code/azoff/penguino/Makefile \
+	.config/vivaldi .config/1Password .local/share/keyrings/login.keyring Documents
+pop26-backup:
+	@test -n "$(DEST)" || { echo "usage: make pop26-backup DEST=/media/$(USER)/<drive>/home [SKIP_DROPBOX=yes]"; exit 1; }
+	@test -d "$(DEST)" || { echo "$(DEST) is not a directory (is the drive mounted? mkdir it first)"; exit 1; }
+	@fs=$$(findmnt -no FSTYPE -T "$(DEST)"); case "$$fs" in vfat|exfat|ntfs*|fuseblk|msdos) echo "$(DEST) is on $$fs, which cannot store permissions or symlinks -- reformat the drive as ext4 (see docs/pop26-plasma.md)"; exit 1;; esac
+	rsync -aHAX --info=progress2 $(BACKUP_EXCLUDES) $(HOME)/ $(DEST)/
+	@$(MAKE) --no-print-directory pop26-backup-verify DEST="$(DEST)" SKIP_DROPBOX="$(SKIP_DROPBOX)" LEAN="$(LEAN)" EXTRA="$(EXTRA)"
+
+# compare the backup against home (changes nothing) and check the files that
+# exist nowhere else. Run it again right before wiping the disk.
+pop26-backup-verify:
+	@test -d "$(DEST)" || { echo "usage: make pop26-backup-verify DEST=/media/$(USER)/<drive>/home"; exit 1; }
+	@echo "--- files missing or different in the backup (only files changed since the copy should appear)"
+	@rsync -aHAXn --itemize-changes $(BACKUP_EXCLUDES) $(HOME)/ $(DEST)/ | grep -v '^\.d' | head -40 | sed 's/^/  /'
+	@echo "--- must-have paths"
+	@fail=0; for p in $(BACKUP_MUST_HAVE); do if [ -e "$(DEST)/$$p" ]; then echo "  ok       $$p"; else echo "  MISSING  $$p"; fail=1; fi; done; \
+		[ $$fail -eq 0 ] || { echo "!! do not wipe the disk until nothing above is MISSING"; exit 1; }
+	@echo "--- backup size: $$(du -sh "$(DEST)" 2>/dev/null | cut -f1)"
+
+# ---------------------------------------------------------------------------
+# KDE Plasma 6 desktop (Ubuntu 26.04 packages; Pop's repo does not override
+# them). Every target below is a no-op until `make plasma` has been run.
+# ---------------------------------------------------------------------------
+desktop: plasma plasma-shortcuts konsole app-profiles
+
+# installs Plasma. sddm (Plasma's login screen) comes along and debconf asks
+# which display manager to use: choose sddm.
+plasma:
+	@echo ">> if asked for the default display manager, choose sddm"
+	sudo apt update
+	sudo apt install -y kde-plasma-desktop plasma-nm plasma-pa kscreen kwalletmanager kde-config-sddm sddm-theme-breeze
+
+# make SDDM the display manager if the install prompt was missed; reboot to apply
+plasma-dm:
+	sudo dpkg-reconfigure sddm
+	@echo "display manager is now: $$(cat /etc/X11/default-display-manager) -- reboot to apply"
+
+# Plasma global shortcuts for CopyQ (Meta+V toggle, Meta+Alt+V menu). Meta+V
+# is Klipper's by default, so that binding is cleared. Log out and back in to
+# apply; if a shortcut does not take, set it in System Settings > Shortcuts.
+plasma-shortcuts:
+	@if ! command -v kwriteconfig6 >/dev/null; then echo "Plasma is not installed (make plasma) -- skipping shortcuts"; else \
+		mkdir -p $(HOME)/.local/share/applications; \
+		for f in $(ROOT_DIR)/conf/.local/share/applications/copyq-*.desktop; do ln -svf $$f $(HOME)/.local/share/applications/; done; \
+		update-desktop-database $(HOME)/.local/share/applications 2>/dev/null || true; \
+		kwriteconfig6 --file kglobalshortcutsrc --group services --group copyq-toggle.desktop --key _launch "Meta+V"; \
+		kwriteconfig6 --file kglobalshortcutsrc --group services --group copyq-menu.desktop --key _launch "Meta+Alt+V"; \
+		kwriteconfig6 --file kglobalshortcutsrc --group plasmashell --key show-on-mouse-pos "none,Meta+V,Show Clipboard Items at Mouse Position"; \
+		echo "shortcuts written -- log out and back in to apply"; \
+	fi
+
+# Konsole profile (font)
+konsole: iosevka
+	mkdir -p $(HOME)/.local/share/konsole
+	ln -svf $(ROOT_DIR)/conf/.local/share/konsole/penguino.profile $(HOME)/.local/share/konsole/penguino.profile
+	@if command -v kwriteconfig6 >/dev/null; then kwriteconfig6 --file konsolerc --group "Desktop Entry" --key DefaultProfile penguino.profile; else echo "Plasma is not installed (make plasma) -- profile linked but not set as default"; fi
+
+# bulk app launch on command: `app-profile work`, `app-profile --list`
+# (plain-text profiles in conf/.config/app-profiles)
+app-profiles:
+	mkdir -p $(HOME)/.local/bin $(HOME)/.config
+	ln -svf $(ROOT_DIR)/conf/bin/app-profile $(HOME)/.local/bin/app-profile
+	ln -svfn $(ROOT_DIR)/conf/.config/app-profiles $(HOME)/.config/app-profiles
 
 # developer tools
-dev: vscode gh nvm rbenv python3 open docker bun rust kubectl pyenv starship nerd-fonts claude oh-my-zsh
+dev: vscode gh nvm rbenv python3 open docker bun rust kubectl pyenv starship nerd-fonts konsole claude oh-my-zsh
 
 starship:
 	curl -sS https://starship.rs/install.sh | sh
@@ -32,8 +135,30 @@ nerd-fonts:
 	unzip ~/Downloads/0xProto.zip -d ~/.local/share/fonts
 	fc-cache -fv
 
+# Iosevka Term (Nerd Font patched so starship/eza glyphs keep working); only the
+# weights a terminal uses, the full archive is ~350M of TTFs
+iosevka:
+	mkdir -p $(HOME)/.local/share/fonts/IosevkaTerm
+	curl -L 'https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/IosevkaTerm.tar.xz' | \
+	  tar -xJ -C $(HOME)/.local/share/fonts/IosevkaTerm --wildcards \
+	  'IosevkaTermNerdFontMono-Regular.ttf' 'IosevkaTermNerdFontMono-Italic.ttf' \
+	  'IosevkaTermNerdFontMono-Bold.ttf' 'IosevkaTermNerdFontMono-BoldItalic.ttf' \
+	  'IosevkaTermNerdFontMono-Medium.ttf' 'IosevkaTermNerdFontMono-MediumItalic.ttf' \
+	  'IosevkaTermNerdFontMono-SemiBold.ttf' 'IosevkaTermNerdFontMono-SemiBoldItalic.ttf' \
+	  'IosevkaTermNerdFontMono-Light.ttf' 'IosevkaTermNerdFontMono-LightItalic.ttf'
+	fc-cache -f
+
 claude:
 	curl -fsSL https://claude.ai/install.sh | bash
+
+# official Claude desktop app (replaced the claude.ai Vivaldi PWA, 2026-09-29);
+# desktop id / Wayland app_id is com.anthropic.Claude. The download endpoint
+# sits behind a Cloudflare JS challenge (403 for curl/wget), so grab the deb
+# in a browser first; the app self-updates after that.
+CLAUDE_DESKTOP_URL := https://claude.ai/api/desktop/linux/x64/deb/latest/redirect
+claude-desktop:
+	@test -f ~/Downloads/claude-desktop_amd64.deb || { echo "download $(CLAUDE_DESKTOP_URL) in a browser to ~/Downloads first"; exit 1; }
+	sudo apt install -y ~/Downloads/claude-desktop_amd64.deb
 
 pyenv:
 	curl https://pyenv.run | bash
@@ -92,7 +217,7 @@ rbenv:
 	curl -fsSL https://github.com/rbenv/rbenv-installer/raw/HEAD/bin/rbenv-installer | bash
 
 # system settings
-conf: ssh gpg autostart
+conf: ssh gpg autostart vivaldi-pwa
 
 # set up local configs
 ssh:
@@ -112,16 +237,12 @@ autostart:
 # debian packages
 apts: apt-setup snapd dropbox 1password zsh git openssh-server awscli copyq vivaldi displaylink
 
-# global shortcuts live in the compositor on COSMIC/Wayland (apps can't grab keys)
-copyq: cosmic-shortcuts
+# global shortcuts live in the compositor on Wayland (apps can't grab keys),
+# so plasma-shortcuts binds them
+copyq: plasma-shortcuts
 	sudo add-apt-repository -y ppa:hluk/copyq
 	sudo apt update
 	sudo apt install -y copyq
-
-# COSMIC custom keybindings (Super+Alt+V copyq menu, Super+V copyq toggle)
-cosmic-shortcuts:
-	mkdir -p $(HOME)/.config/cosmic/com.system76.CosmicSettings.Shortcuts/v1
-	ln -svf $(ROOT_DIR)/conf/.config/cosmic/com.system76.CosmicSettings.Shortcuts/v1/custom $(HOME)/.config/cosmic/com.system76.CosmicSettings.Shortcuts/v1/custom
 
 # DisplayLink driver for USB docking station video (evdi dkms module)
 displaylink:
@@ -143,19 +264,51 @@ gopro:
 	sudo ln -svf $(ROOT_DIR)/conf/gopro/gopro /usr/local/sbin/gopro
 
 # Vivaldi/Chromium segfaults probing uvcvideo *metadata* nodes (laptop camera
-# video1) during getUserMedia -- hide them from user apps via udev
+# video1) during getUserMedia -- hide them from user apps via udev. The rule
+# strips the uaccess tag (>70 so it runs after 70-uaccess.rules); the setfacl
+# clears the per-seat ACL logind already granted on existing nodes.
 uvc-metadata-fix:
-	sudo ln -svf $(ROOT_DIR)/conf/camera/60-uvc-metadata-hide.rules /etc/udev/rules.d/60-uvc-metadata-hide.rules
+	sudo rm -f /etc/udev/rules.d/60-uvc-metadata-hide.rules
+	sudo ln -svf $(ROOT_DIR)/conf/camera/75-uvc-metadata-hide.rules /etc/udev/rules.d/75-uvc-metadata-hide.rules
 	sudo udevadm control --reload
 	sudo udevadm trigger --subsystem-match=video4linux
+	for d in /dev/video*; do \
+		if udevadm info $$d | grep -q 'ID_V4L_CAPABILITIES=:$$' && udevadm info $$d | grep -q 'ID_USB_DRIVER=uvcvideo'; then \
+			sudo setfacl -b $$d; sudo chmod 000 $$d; sudo chgrp root $$d; \
+			echo "hidden: $$d"; \
+		fi; \
+	done
 
-# PWAs run in a separate vivaldi instance (~/.config/vivaldi-apps) so launch
-# order can't disable main-browser extensions; this wires up the link-out
-# extension so external links clicked in a PWA open in main Vivaldi instead
-# of a vanilla window of the apps instance
-vivaldi-pwa-linkout:
-	chmod +x $(ROOT_DIR)/conf/vivaldi/linkout-host $(ROOT_DIR)/conf/vivaldi/install-linkout.sh
-	$(ROOT_DIR)/conf/vivaldi/install-linkout.sh
+# PWAs are --app windows of the main Vivaldi instance (one browser, one set
+# of extensions; out-of-scope links open natively as tabs in the main window).
+# Every launcher carries --load-extension=<pwa-router>,<missive-solo>: the
+# router sends Missive links back into the Missive app window and reaps the
+# dead tab a custom-scheme launch (Vimcal "v" -> zoommtg://) leaves behind;
+# missive-solo auto-picks "In this conversation" on Forward/Reply. The
+# vivaldi-stable entry shadows the packaged one for the same reason.
+vivaldi-pwa:
+	for f in $(ROOT_DIR)/conf/.local/share/applications/vivaldi-*.desktop; do ln -svf $$f $(HOME)/.local/share/applications/; done
+	update-desktop-database $(HOME)/.local/share/applications 2>/dev/null || true
+
+# managed policy: no extension runs on the PWA origins except 1Password
+vivaldi-policy:
+	sudo install -Dm644 $(ROOT_DIR)/conf/vivaldi/policies/pwa-extensions.json /etc/vivaldi/policies/managed/pwa-extensions.json
+
+# Vivaldi's pre-permission media prober segfaults the browser (fd race);
+# pre-granting camera/mic to the PWA origins skips that code path.
+# Run with Vivaldi stopped.
+vivaldi-pwa-media:
+	chmod +x $(ROOT_DIR)/conf/vivaldi/preseed-media-permissions
+	$(ROOT_DIR)/conf/vivaldi/preseed-media-permissions
+
+# stale Dell-era /etc/modprobe.d/alsa.conf pins snd-hda-intel to ALSA slots
+# 0-1, which loses a probe race on docked boots and leaves internal audio
+# missing entirely; disable it and reprobe (hda-jack-retask.conf stays -- that
+# one is an intentional jack fix)
+alsa-hda-fix:
+	sudo mv -v /etc/modprobe.d/alsa.conf /etc/modprobe.d/alsa.conf.disabled
+	sudo modprobe -r snd_hda_intel || true
+	sudo modprobe snd_hda_intel
 
 # force Zoom P4 as default audio sink/source whenever it appears; wireplumber's
 # name-based memory misses when the dock re-enumerates the P4 under a suffixed
@@ -168,6 +321,13 @@ zoom-p4-audio:
 	systemctl --user daemon-reload
 	systemctl --user enable zoom-p4-audio.service
 	systemctl --user restart wireplumber zoom-p4-audio.service
+
+# hide the DisplayLink dock's audio card so docking never steals the default
+# output from the laptop/P4 (wireplumber re-picks any device chosen before)
+dock-audio-off:
+	mkdir -p $(HOME)/.config/wireplumber/wireplumber.conf.d
+	ln -svf $(ROOT_DIR)/conf/audio/50-dock-audio-off.conf $(HOME)/.config/wireplumber/wireplumber.conf.d/50-dock-audio-off.conf
+	@echo "restart wireplumber when not on a call: systemctl --user restart wireplumber"
 
 # NM wifi backend (wpa_supplicant; see conf/wifi/wifi-backend.conf for history)
 # iwd is masked so nothing (dbus activation, stale scripts) can start it and
@@ -228,7 +388,7 @@ dropbox:
 	curl -L 'https://www.dropbox.com/download?dl=packages/ubuntu/dropbox_2024.04.17_amd64.deb' > /tmp/dropbox.deb
 	sudo apt install -y python3-gpg /tmp/dropbox.deb
 
-# complete, installable apps for pop_os
+# complete, installable apps (flatpak)
 # user-scope installs: run make as your user, not via sudo (root has no remotes)
 flatpaks: flathub slack whatsapp zoom
 
