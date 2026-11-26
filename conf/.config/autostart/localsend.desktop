@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=LocalSend
+Comment=Receive files from the iPhone; starts hidden in the system tray
+Icon=org.localsend.localsend_app
+# --hidden: tray only, no window. Leave LocalSend's own "Launch at startup"
+# setting off -- it would write a second entry into this (linked) folder.
+Exec=/usr/bin/flatpak run --branch=stable --arch=x86_64 --command=localsend org.localsend.localsend_app --hidden
+X-GNOME-Autostart-enabled=true

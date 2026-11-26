@@ -492,7 +492,7 @@ dropbox:
 
 # complete, installable apps (flatpak)
 # user-scope installs: run make as your user, not via sudo (root has no remotes)
-flatpaks: flathub slack whatsapp
+flatpaks: flathub slack whatsapp localsend
 
 flathub:
 	flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
@@ -502,6 +502,11 @@ flathub:
 # repo, so re-run to update. Removes the flatpak if present (its data in
 # ~/.var/app/us.zoom.Zoom goes too; the .deb keeps its own in ~/.zoom).
 zoom:
+# AirDrop-style file/text sharing with the iPhone over the local network
+# (LocalSend app on iOS); port 53317 TCP+UDP if a firewall is ever enabled
+localsend: flathub
+	flatpak install --user -y flathub org.localsend.localsend_app
+
 	curl -fL 'https://zoom.us/client/latest/zoom_amd64.deb' -o /tmp/zoom_amd64.deb
 	sudo apt install -y /tmp/zoom_amd64.deb
 	-flatpak uninstall --user -y --delete-data us.zoom.Zoom 2>/dev/null
