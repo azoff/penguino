@@ -16,7 +16,9 @@ import dbus
 
 MODS = {"meta": 0x10000000, "ctrl": 0x04000000, "alt": 0x08000000, "shift": 0x02000000}
 NAMED = {"space": 0x20, "return": 0x01000004, "enter": 0x01000005, "tab": 0x01000001,
-         "esc": 0x01000000, "print": 0x01000009, "pgup": 0x01000016, "pgdown": 0x01000017}
+         "esc": 0x01000000, "print": 0x01000009, "pgup": 0x01000016, "pgdown": 0x01000017,
+         "media play": 0x01000080, "media pause": 0x1000085, "media stop": 0x01000081,
+         "media next": 0x01000083, "media previous": 0x01000082}
 
 
 def keycode(spec):

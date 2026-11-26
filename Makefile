@@ -154,18 +154,23 @@ plasma-theme:
 # kwriteconfig6 is safe and the .desktop default applies at the next login.
 # Keep CopyQ's own global shortcuts (its Commands dialog) empty so the two
 # don't fight over a key.
+# The Play/Pause media key runs conf/bin/media-playpause instead of Plasma's
+# handler, which loses track of Spotify's state and then only ever pauses.
 plasma-shortcuts:
 	@if ! command -v kwriteconfig6 >/dev/null; then echo "Plasma is not installed (make plasma) -- skipping shortcuts"; else \
 		mkdir -p $(HOME)/.local/share/applications; \
-		for f in $(ROOT_DIR)/conf/.local/share/applications/copyq-*.desktop; do ln -svf $$f $(HOME)/.local/share/applications/; done; \
+		for f in $(ROOT_DIR)/conf/.local/share/applications/copyq-*.desktop $(ROOT_DIR)/conf/.local/share/applications/media-playpause.desktop; do ln -svf $$f $(HOME)/.local/share/applications/; done; \
 		update-desktop-database $(HOME)/.local/share/applications 2>/dev/null || true; \
 		if busctl --user status org.kde.kglobalaccel >/dev/null 2>&1; then \
 			K="/usr/bin/python3 -I $(ROOT_DIR)/conf/bin/kde-shortcut"; \
 			$$K plasmashell show-on-mouse-pos none && \
-			$$K copyq-menu.desktop _launch Meta+Alt+V; \
+			$$K copyq-menu.desktop _launch Meta+Alt+V && \
+			$$K mediacontrol playpausemedia none && \
+			$$K media-playpause.desktop _launch "Media Play"; \
 		else \
 			kwriteconfig6 --file kglobalshortcutsrc --group plasmashell --key show-on-mouse-pos "none,Meta+V,Show Clipboard Items at Mouse Position"; \
 			kwriteconfig6 --file kglobalshortcutsrc --group services --group copyq-menu.desktop --key _launch --delete; \
+			kwriteconfig6 --file kglobalshortcutsrc --group mediacontrol --key playpausemedia "none,Media Play,Play/Pause media playback"; \
 			echo "no Plasma session: Klipper's Meta+V cleared; CopyQ's Meta+Alt+V comes from its .desktop file at next login"; \
 		fi; \
 	fi
@@ -497,16 +502,16 @@ flatpaks: flathub slack whatsapp localsend
 flathub:
 	flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 
-# Zoom as a .deb, not the flatpak: zoommtg:// links from the browser reach it
-# directly, and it sees the P4/dock audio and cameras without a sandbox. No apt
-# repo, so re-run to update. Removes the flatpak if present (its data in
-# ~/.var/app/us.zoom.Zoom goes too; the .deb keeps its own in ~/.zoom).
-zoom:
 # AirDrop-style file/text sharing with the iPhone over the local network
 # (LocalSend app on iOS); port 53317 TCP+UDP if a firewall is ever enabled
 localsend: flathub
 	flatpak install --user -y flathub org.localsend.localsend_app
 
+# Zoom as a .deb, not the flatpak: zoommtg:// links from the browser reach it
+# directly, and it sees the P4/dock audio and cameras without a sandbox. No apt
+# repo, so re-run to update. Removes the flatpak if present (its data in
+# ~/.var/app/us.zoom.Zoom goes too; the .deb keeps its own in ~/.zoom).
+zoom:
 	curl -fL 'https://zoom.us/client/latest/zoom_amd64.deb' -o /tmp/zoom_amd64.deb
 	sudo apt install -y /tmp/zoom_amd64.deb
 	-flatpak uninstall --user -y --delete-data us.zoom.Zoom 2>/dev/null

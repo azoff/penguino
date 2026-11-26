@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Media Play/Pause
+Comment=Play/Pause media key, asking players for their live state (conf/bin/media-playpause)
+Exec=/home/azoff/Code/azoff/penguino/conf/bin/media-playpause
+Icon=media-playback-start
+NoDisplay=true
+X-KDE-Shortcuts=Media Play

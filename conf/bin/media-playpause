@@ -1,0 +1,20 @@
+#!/bin/sh
+# Play/Pause media key (bound by `make plasma-shortcuts`). Asks every MPRIS
+# player for its live state on each press instead of trusting a cache:
+# Plasma's own handler (kded6 mprisservice) loses track of Spotify's state and
+# then sends Pause to a paused player, so play/pause stops working.
+#   anything playing -> pause what is playing
+#   nothing playing  -> resume the first paused player (Spotify first)
+players=$(busctl --user --list list 2>/dev/null | awk '$1 ~ /^org\.mpris\.MediaPlayer2\./ && $2 != "-" {print $1}' | sort -t. -k4 | awk '/\.spotify$/{print; next} {rest = rest $0 "\n"} END {printf "%s", rest}')
+status() { busctl --user get-property "$1" /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player PlaybackStatus 2>/dev/null | cut -d'"' -f2; }
+call() { busctl --user call "$1" /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player "$2" >/dev/null 2>&1; }
+
+playing=""
+for p in $players; do [ "$(status "$p")" = Playing ] && playing="$playing $p"; done
+if [ -n "$playing" ]; then
+    for p in $playing; do call "$p" Pause; done
+    exit 0
+fi
+for p in $players; do
+    if [ "$(status "$p")" = Paused ]; then call "$p" Play; exit 0; fi
+done
