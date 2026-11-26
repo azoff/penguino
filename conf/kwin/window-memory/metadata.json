@@ -1,0 +1,13 @@
+{
+    "KPackageStructure": "KWin/Script",
+    "KPlugin": {
+        "Id": "window-memory",
+        "Name": "Window Memory",
+        "Description": "Remembers where each app's windows go for each set of connected monitors; Meta+Ctrl+S saves, Meta+Ctrl+L re-applies",
+        "Icon": "preferences-system-windows",
+        "License": "MIT",
+        "EnabledByDefault": false
+    },
+    "X-Plasma-API": "declarativescript",
+    "X-Plasma-MainScript": "ui/main.qml"
+}

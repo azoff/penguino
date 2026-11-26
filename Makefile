@@ -82,32 +82,92 @@ pop26-backup-verify:
 # KDE Plasma 6 desktop (Ubuntu 26.04 packages; Pop's repo does not override
 # them). Every target below is a no-op until `make plasma` has been run.
 # ---------------------------------------------------------------------------
-desktop: plasma plasma-shortcuts konsole app-profiles
+desktop: plasma plasma-theme plasma-shortcuts konsole app-profiles window-memory
 
 # installs Plasma. sddm (Plasma's login screen) comes along and debconf asks
 # which display manager to use: choose sddm.
 plasma:
 	@echo ">> if asked for the default display manager, choose sddm"
 	sudo apt update
-	sudo apt install -y kde-plasma-desktop plasma-nm plasma-pa kscreen kwalletmanager kde-config-sddm sddm-theme-breeze
+	# kde-plasma-desktop is the minimal set: no screenshot tool (Spectacle owns Print)
+	sudo apt install -y kde-plasma-desktop plasma-nm plasma-pa kscreen kwalletmanager kde-config-sddm sddm-theme-breeze kde-spectacle
+
+# copy the GNOME login keyring into KWallet (adds only; GNOME keyring is left
+# as is). Run inside Plasma while gnome-keyring is still running; KWallet may
+# ask to confirm. Dry run: conf/bin/keyring-to-kwallet
+kwallet-migrate:
+	/usr/bin/python3 -I $(ROOT_DIR)/conf/bin/keyring-to-kwallet --apply
+
+# Chromium/Electron apps (Vivaldi, Slack, VS Code, Claude) keep their cookie
+# key in KWallet on Plasma, in the GNOME keyring before. Copies each key over,
+# checked against the app's data first. Run with the apps closed, BEFORE their
+# first Plasma launch (they discard what they cannot decrypt). Dry run:
+# conf/bin/chromium-keys-to-kwallet
+kwallet-app-keys:
+	/usr/bin/python3 -I $(ROOT_DIR)/conf/bin/chromium-keys-to-kwallet --apply
+
+# Window Memory: per-monitor-setup window positions (conf/kwin/window-memory,
+# storage in conf/bin/window-memory-store, layouts in
+# conf/.config/window-memory/layouts.json, linked from ~/.config). Meta+Ctrl+S saves the layout for the
+# connected monitors, Meta+Ctrl+L re-applies it. Re-run after editing either
+# file: it restarts the store and reloads the script.
+WM_DBUS_SERVICE := $(HOME)/.local/share/dbus-1/services/local.penguino.WindowMemory.service
+window-memory:
+	mkdir -p $(HOME)/.local/share/kwin/scripts $(dir $(WM_DBUS_SERVICE))
+	@# layouts live in the repo; the folder is linked (not the file: the store
+	@# saves by renaming a temp file over layouts.json, which would replace a link)
+	@if [ -d $(HOME)/.config/window-memory ] && [ ! -L $(HOME)/.config/window-memory ]; then \
+		echo "!! ~/.config/window-memory is a real folder: move its layouts.json into conf/.config/window-memory, remove it, re-run"; exit 1; fi
+	ln -svfn $(ROOT_DIR)/conf/.config/window-memory $(HOME)/.config/window-memory
+	ln -svfn $(ROOT_DIR)/conf/kwin/window-memory $(HOME)/.local/share/kwin/scripts/window-memory
+	printf '[D-BUS Service]\nName=local.penguino.WindowMemory\nExec=/usr/bin/python3 -I $(ROOT_DIR)/conf/bin/window-memory-store\n' > $(WM_DBUS_SERVICE)
+	kwriteconfig6 --file kwinrc --group Plugins --key window-memoryEnabled true
+	-pkill -f '^/usr/bin/python3 -I [^ ]*/window-memory-store$$'
+	@if busctl --user status org.kde.KWin >/dev/null 2>&1; then \
+		qdbus6 org.kde.KWin /Scripting org.kde.kwin.Scripting.unloadScript window-memory >/dev/null; \
+		qdbus6 org.kde.KWin /KWin org.kde.KWin.reconfigure; \
+		echo "window-memory loaded"; \
+	else echo "no Plasma session: window-memory loads at next login"; fi
 
 # make SDDM the display manager if the install prompt was missed; reboot to apply
 plasma-dm:
 	sudo dpkg-reconfigure sddm
 	@echo "display manager is now: $$(cat /etc/X11/default-display-manager) -- reboot to apply"
 
-# Plasma global shortcuts for CopyQ (Meta+V toggle, Meta+Alt+V menu). Meta+V
-# is Klipper's by default, so that binding is cleared. Log out and back in to
-# apply; if a shortcut does not take, set it in System Settings > Shortcuts.
+# Breeze Dark colors + icons. A home restored from COSMIC (or any COSMIC
+# login since) leaves CosmicDark/Cosmic in kdeglobals, which Plasma can't
+# recolor: symbolic icons vanish into the background (file picker buttons).
+# Plasma syncs the change to GTK's settings.ini. Re-run after using COSMIC.
+PLASMA_CHANGEICONS := /usr/lib/x86_64-linux-gnu/libexec/plasma-changeicons
+plasma-theme:
+	@if ! command -v plasma-apply-colorscheme >/dev/null; then echo "Plasma is not installed (make plasma) -- skipping theme"; else \
+		plasma-apply-colorscheme BreezeDark; \
+		$(PLASMA_CHANGEICONS) breeze-dark; \
+	fi
+
+# Plasma global shortcut for CopyQ: Meta+Alt+V opens its tray menu (the
+# default in conf/.local/share/applications/copyq-menu.desktop). Not
+# Ctrl+Shift+V: that is paste in Konsole/terminals. Klipper's Meta+V is
+# cleared, since CopyQ replaces it. Inside a Plasma session the shortcut is set
+# through kglobalaccel (conf/bin/kde-shortcut): kwriteconfig6 edits get
+# overwritten by the running kglobalaccel. Outside a session (TTY),
+# kwriteconfig6 is safe and the .desktop default applies at the next login.
+# Keep CopyQ's own global shortcuts (its Commands dialog) empty so the two
+# don't fight over a key.
 plasma-shortcuts:
 	@if ! command -v kwriteconfig6 >/dev/null; then echo "Plasma is not installed (make plasma) -- skipping shortcuts"; else \
 		mkdir -p $(HOME)/.local/share/applications; \
 		for f in $(ROOT_DIR)/conf/.local/share/applications/copyq-*.desktop; do ln -svf $$f $(HOME)/.local/share/applications/; done; \
 		update-desktop-database $(HOME)/.local/share/applications 2>/dev/null || true; \
-		kwriteconfig6 --file kglobalshortcutsrc --group services --group copyq-toggle.desktop --key _launch "Meta+V"; \
-		kwriteconfig6 --file kglobalshortcutsrc --group services --group copyq-menu.desktop --key _launch "Meta+Alt+V"; \
-		kwriteconfig6 --file kglobalshortcutsrc --group plasmashell --key show-on-mouse-pos "none,Meta+V,Show Clipboard Items at Mouse Position"; \
-		echo "shortcuts written -- log out and back in to apply"; \
+		if busctl --user status org.kde.kglobalaccel >/dev/null 2>&1; then \
+			K="/usr/bin/python3 -I $(ROOT_DIR)/conf/bin/kde-shortcut"; \
+			$$K plasmashell show-on-mouse-pos none && \
+			$$K copyq-menu.desktop _launch Meta+Alt+V; \
+		else \
+			kwriteconfig6 --file kglobalshortcutsrc --group plasmashell --key show-on-mouse-pos "none,Meta+V,Show Clipboard Items at Mouse Position"; \
+			kwriteconfig6 --file kglobalshortcutsrc --group services --group copyq-menu.desktop --key _launch --delete; \
+			echo "no Plasma session: Klipper's Meta+V cleared; CopyQ's Meta+Alt+V comes from its .desktop file at next login"; \
+		fi; \
 	fi
 
 # Konsole profile (font)
@@ -192,16 +252,16 @@ vscode:
 	sudo update-alternatives --set editor /usr/bin/code
 	sudo update-alternatives --install /usr/bin/editor editor /usr/bin/code 10
 
-# https://community.frame.work/t/fingerprint-scanner-compatibility-with-linux-ubuntu-fedora-etc/1501/18
+# Framework's Goodix reader works with the stock packages (Pop installs them).
+# The udev rule keeps the reader out of USB autosuspend. No pam-auth-update:
+# that would put fingerprint into common-auth, i.e. the login screen.
 fprintd:
-	sudo apt install fprintd libpam-fprintd gettext gtk-doc-tools libfprint-2-dev libgirepository1.0-dev libgusb-dev libpam-wrapper libpam0g-dev libpamtest0-dev libpolkit-gobject-1-dev libsystemd-dev libdbus-1-dev libxml2-utils python3-pypamtest
-	pip install ninja gobject python-dbusmock meson
-	sudo pam-auth-update
+	sudo apt install -y fprintd libpam-fprintd
 	sudo ln -svf $(ROOT_DIR)/conf/fingerprint/60-goodix-no-autosuspend.rules /etc/udev/rules.d/60-goodix-no-autosuspend.rules
 	sudo udevadm control --reload && sudo udevadm trigger --subsystem-match=usb --attr-match=idVendor=27c6
 
 # fingerprint at lock screen + sudo only, never at initial login (keyring)
-fingerprint-pam:
+fingerprint-pam: fprintd
 	sudo sh $(ROOT_DIR)/conf/fingerprint/install-fingerprint-pam.sh
 
 python3:
@@ -235,21 +295,35 @@ autostart:
 	ln -svf $(ROOT_DIR)/conf/.config/autostart $(HOME)/.config/autostart
 
 # debian packages
-apts: apt-setup snapd dropbox 1password zsh git openssh-server awscli copyq vivaldi displaylink
+apts: apt-setup snapd dropbox 1password zsh git openssh-server awscli copyq vivaldi displaylink zoom obs
 
 # global shortcuts live in the compositor on Wayland (apps can't grab keys),
 # so plasma-shortcuts binds them
+# Ubuntu 26.04 ships CopyQ 13; ppa:hluk/copyq has no resolute build (2026-11-25)
 copyq: plasma-shortcuts
-	sudo add-apt-repository -y ppa:hluk/copyq
-	sudo apt update
 	sudo apt install -y copyq
 
-# DisplayLink driver for USB docking station video (evdi dkms module)
+# DisplayLink driver for USB docking station video (evdi dkms module).
+# Synaptics' dkms evdi is named explicitly: otherwise apt satisfies the
+# dependency with linux-modules-evdi-oem-26.04, which drags in Ubuntu's whole
+# OEM kernel and has no module for Pop's kernel. Safe to re-run: it also
+# removes that OEM kernel if an earlier run pulled it in (only once evdi has
+# built for the running kernel, and never when running an OEM kernel).
 displaylink:
 	curl -L 'https://www.synaptics.com/sites/default/files/Ubuntu/pool/stable/main/all/synaptics-repository-keyring.deb' > /tmp/synaptics-keyring.deb
 	sudo apt install -y /tmp/synaptics-keyring.deb
 	sudo apt update
-	sudo apt install -y displaylink-driver
+	sudo apt install -y evdi displaylink-driver
+	@if ! dkms status evdi | grep -q "$$(uname -r).*installed"; then \
+		echo "!! evdi did not build for kernel $$(uname -r):"; dkms status evdi; \
+		echo "!! see /var/lib/dkms/evdi/*/build/make.log"; exit 1; \
+	fi
+	@case "$$(uname -r)" in *-oem) echo "running an OEM kernel -- leaving OEM packages alone";; *) \
+		oem=$$(dpkg-query -W -f='$${db:Status-Abbrev} $${Package}\n' 'linux-*oem*' 2>/dev/null | awk '$$1=="ii"{print $$2}' | grep -E '^linux-(image|modules|main-modules-[a-z]+)-[0-9.]+-[0-9]+-oem$$|^linux-modules-evdi-oem-' || true); \
+		if [ -n "$$oem" ]; then echo ">> removing OEM kernel pulled in for evdi:" $$oem; sudo apt purge -y $$oem; fi;; \
+	esac
+	sudo systemctl start displaylink-driver
+	@systemctl is-active displaylink-driver
 
 awscli:
 	sudo apt install -y awscli
@@ -337,6 +411,18 @@ wifi-backend:
 	sudo systemctl mask --now iwd
 	sudo systemctl restart NetworkManager
 
+# machine name: make hostname [HOST=azwork]; also points 127.0.1.1 at it in
+# /etc/hosts so the machine still resolves its own name
+HOST ?= azwork
+hostname:
+	sudo hostnamectl set-hostname $(HOST)
+	if grep -q '^127\.0\.1\.1[[:space:]]' /etc/hosts; then \
+		sudo sed -i 's/^127\.0\.1\.1[[:space:]].*/127.0.1.1\t$(HOST)/' /etc/hosts; \
+	else \
+		printf '127.0.1.1\t%s\n' '$(HOST)' | sudo tee -a /etc/hosts > /dev/null; \
+	fi
+	@echo "hostname is now: $$(hostnamectl --static)"
+
 # openssh server
 openssh-server:
 	sudo apt install -y openssh-server
@@ -358,7 +444,7 @@ oh-my-zsh:
 # a more modern shell
 zsh:
 	sudo apt install -y zsh
-	chsh -s $(which zsh)
+	chsh -s $$(which zsh)
 	ln -fs $(ROOT_DIR)/zsh/.zshrc ~/.zshrc
 	ln -fs $(ROOT_DIR)/zsh/.zcompdump ~/.zcompdump
 
@@ -390,13 +476,23 @@ dropbox:
 
 # complete, installable apps (flatpak)
 # user-scope installs: run make as your user, not via sudo (root has no remotes)
-flatpaks: flathub slack whatsapp zoom
+flatpaks: flathub slack whatsapp
 
 flathub:
 	flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 
-zoom: flathub
-	flatpak install --user -y flathub us.zoom.Zoom
+# Zoom as a .deb, not the flatpak: zoommtg:// links from the browser reach it
+# directly, and it sees the P4/dock audio and cameras without a sandbox. No apt
+# repo, so re-run to update. Removes the flatpak if present (its data in
+# ~/.var/app/us.zoom.Zoom goes too; the .deb keeps its own in ~/.zoom).
+zoom:
+	curl -fL 'https://zoom.us/client/latest/zoom_amd64.deb' -o /tmp/zoom_amd64.deb
+	sudo apt install -y /tmp/zoom_amd64.deb
+	-flatpak uninstall --user -y --delete-data us.zoom.Zoom 2>/dev/null
+
+# screen recording / streaming (Ubuntu's package)
+obs:
+	sudo apt install -y obs-studio
 
 vivaldi:
 	wget -qO- https://repo.vivaldi.com/archive/linux_signing_key.pub | gpg --dearmor | sudo tee /usr/share/keyrings/vivaldi-browser.gpg > /dev/null
@@ -404,11 +500,11 @@ vivaldi:
 	sudo apt update
 	sudo apt install -y vivaldi-stable
 
-slack:
-	flatpak install -y com.slack.Slack
+slack: flathub
+	flatpak install --user -y flathub com.slack.Slack
 
-whatsapp:
-	flatpak install -y io.github.mimbrero.WhatsAppDesktop
+whatsapp: flathub
+	flatpak install --user -y flathub io.github.mimbrero.WhatsAppDesktop
 
 # complete, installable apps for ubuntu
 snaps: spotify

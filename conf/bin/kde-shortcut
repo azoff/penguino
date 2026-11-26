@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+"""Set a Plasma global shortcut through kglobalaccel (KWin), so it takes effect
+now and persists. Editing kglobalshortcutsrc with kwriteconfig6 while Plasma
+runs does not stick: kglobalaccel keeps its own copy and writes it back.
+
+  kde-shortcut COMPONENT ACTION KEYS
+  kde-shortcut copyq-toggle.desktop _launch Meta+V
+  kde-shortcut plasmashell show-on-mouse-pos none
+
+COMPONENT/ACTION are as listed by
+  qdbus6 org.kde.kglobalaccel /kglobalaccel allActionsForComponent COMPONENT
+"""
+import sys
+
+import dbus
+
+MODS = {"meta": 0x10000000, "ctrl": 0x04000000, "alt": 0x08000000, "shift": 0x02000000}
+NAMED = {"space": 0x20, "return": 0x01000004, "enter": 0x01000005, "tab": 0x01000001,
+         "esc": 0x01000000, "print": 0x01000009, "pgup": 0x01000016, "pgdown": 0x01000017}
+
+
+def keycode(spec):
+    code = 0
+    *mods, key = spec.split("+")
+    for m in mods:
+        code |= MODS[m.lower()]
+    k = key.lower()
+    if k in NAMED:
+        return code | NAMED[k]
+    if len(key) == 1:
+        return code | ord(key.upper())
+    if k.startswith("f") and k[1:].isdigit():
+        return code | (0x01000030 + int(k[1:]) - 1)
+    sys.exit(f"unknown key: {key}")
+
+
+def main():
+    if len(sys.argv) != 4:
+        sys.exit(__doc__)
+    component, action, keys = sys.argv[1:]
+    kga = dbus.Interface(dbus.SessionBus().get_object("org.kde.kglobalaccel", "/kglobalaccel"),
+                         "org.kde.KGlobalAccel")
+    ids = [list(a) for a in kga.allActionsForComponent([component, action, "", ""])]
+    match = next((a for a in ids if a[1] == action), None)
+    if not match:
+        sys.exit(f"no action {action!r} in component {component!r} (is it registered? log out and in once)")
+    codes = [] if keys.lower() == "none" else [keycode(keys)]
+    kga.setForeignShortcut(dbus.Array(match, signature="s"), dbus.Array(codes, signature="i"))
+    got = [int(k) for k in kga.shortcut(dbus.Array(match, signature="s"))]
+    if [c for c in got if c] != codes:
+        sys.exit(f"!! {component}/{action}: asked for {keys}, kglobalaccel has {got}")
+    print(f"{component}/{action}: {keys}")
+
+
+if __name__ == "__main__":
+    main()

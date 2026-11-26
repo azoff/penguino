@@ -1,0 +1,139 @@
+#!/usr/bin/env python3
+"""Move Chromium/Electron apps' cookie-encryption keys from GNOME keyring to KWallet.
+
+On Plasma these apps read their "v11" key from KWallet folder "<Name> Keys",
+entry "<Name> Safe Storage". Under COSMIC/GNOME the same key lived in the GNOME
+keyring. Started on Plasma without it, an app makes a new key and DISCARDS the
+cookies it cannot decrypt (Slack did: logged out). Run this before an app's
+first Plasma launch, with the app closed.
+
+For each app, the GNOME key is used only if it decrypts the app's cookies (or
+VS Code's stored secrets), so a
+wrong key is never written. Secrets are never printed. Dry run unless --apply.
+
+  chromium-keys-to-kwallet [--apply] [APP ...]     # default: every app below
+"""
+import json
+import os
+import sqlite3
+import subprocess
+import sys
+
+import dbus
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+H = os.path.expanduser("~")
+# name: (KWallet name, GNOME keyring 'application' attribute, encrypted data, process name)
+# encrypted data: cookie DBs, or VS Code's state.vscdb (its secret:// rows use the same key)
+APPS = {
+    "vivaldi": ("Chrome", "chrome", [f"{H}/.config/vivaldi/Default/Cookies"], "vivaldi-bin"),
+    "slack": ("Slack", "Slack", [f"{H}/.var/app/com.slack.Slack/config/Slack/Cookies",
+                                 f"{H}/.config/Slack/Cookies"], "slack"),
+    "code": ("Code", "Code", [f"{H}/.config/Code/User/globalStorage/state.vscdb"], "code"),
+    "claude": ("Claude", "Claude", [f"{H}/.config/Claude/Cookies"], "claude-desktop"),
+}
+
+SS = "org.freedesktop.Secret"
+KW_BUS, KW_PATH, KW_IF = "org.kde.kwalletd6", "/modules/kwalletd6", "org.kde.KWallet"
+APPID = "penguino"
+bus = dbus.SessionBus()
+
+
+def gnome_keys(application):
+    """Candidate keys stored under this application name in the GNOME login keyring."""
+    if bus.get_name_owner("org.freedesktop.secrets") == bus.get_name_owner("org.kde.ksecretd"):
+        sys.exit("gnome-keyring is not running (ksecretd owns org.freedesktop.secrets) -- nothing to read from")
+    svc = dbus.Interface(bus.get_object("org.freedesktop.secrets", "/org/freedesktop/secrets"), SS + ".Service")
+    _, sess = svc.OpenSession("plain", dbus.String("", variant_level=1))
+    coll = dbus.Interface(bus.get_object("org.freedesktop.secrets", "/org/freedesktop/secrets/collection/login"),
+                          SS + ".Collection")
+    out = []
+    for p in coll.SearchItems(dbus.Dictionary({"application": application}, signature="ss")):
+        item = bus.get_object("org.freedesktop.secrets", p)
+        label = str(item.Get(SS + ".Item", "Label", dbus_interface="org.freedesktop.DBus.Properties"))
+        if "Safe Storage" in label:
+            out.append(bytes(dbus.Interface(item, SS + ".Item").GetSecret(sess)[2]))
+    return out
+
+
+def v11_values(db):
+    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    if db.endswith(".vscdb"):
+        rows = (bytes(json.loads(v)["data"]) for (v,) in
+                con.execute("select value from ItemTable where key like 'secret://%'"))
+    else:
+        rows = (bytes(v) for (v,) in con.execute("select encrypted_value from cookies") if v)
+    return [v for v in rows if v[:3] == b"v11"]
+
+
+def decrypts(password, values):
+    key = PBKDF2HMAC(hashes.SHA1(), 16, b"saltysalt", 1).derive(password)
+    ok = 0
+    for v in values:
+        ct = v[3:]
+        if len(ct) % 16:
+            continue
+        pt = Cipher(algorithms.AES(key), modes.CBC(b" " * 16)).decryptor().update(ct)
+        n = pt[-1]
+        ok += 1 <= n <= 16 and pt[-n:] == bytes([n]) * n
+    return ok
+
+
+def main():
+    args = sys.argv[1:]
+    apply = "--apply" in args
+    names = [a for a in args if a != "--apply"] or list(APPS)
+    unknown = set(names) - set(APPS)
+    if unknown:
+        sys.exit(f"unknown app(s): {', '.join(sorted(unknown))}; known: {', '.join(APPS)}")
+
+    kw = dbus.Interface(bus.get_object(KW_BUS, KW_PATH), KW_IF)
+    handle = kw.open("kdewallet", dbus.Int64(0), APPID)
+    if handle < 0:
+        sys.exit("could not open KWallet")
+
+    failed = False
+    for name in names:
+        kname, application, dbs, proc = APPS[name]
+        folder, entry = f"{kname} Keys", f"{kname} Safe Storage"
+        db = next((d for d in dbs if os.path.exists(d)), None)
+        if not db:
+            print(f"{name}: no encrypted data found -- skipped")
+            continue
+        values = v11_values(db)
+        if not values:
+            print(f"{name}: nothing encrypted to check a key against -- skipped")
+            continue
+        current = (str(kw.readPassword(handle, folder, entry, APPID)).encode()
+                   if kw.hasEntry(handle, folder, entry, APPID) else None)
+        if current is not None and decrypts(current, values) == len(values):
+            print(f"{name}: KWallet already has the right key ({len(values)}/{len(values)} items)")
+            continue
+        best = max(gnome_keys(application), key=lambda k: decrypts(k, values), default=None)
+        hits = decrypts(best, values) if best else 0
+        if hits < len(values):
+            print(f"!! {name}: no GNOME keyring key decrypts {db} (best {hits}/{len(values)}) -- not written")
+            failed = True
+            continue
+        what = "replace the new key in" if current is not None else "add to"
+        if not apply:
+            print(f"{name}: would {what} KWallet '{folder}/{entry}' (GNOME key decrypts {hits}/{hits} items)")
+            continue
+        if subprocess.run(["pgrep", "-x", proc], capture_output=True).returncode == 0:
+            print(f"!! {name}: still running ({proc}) -- quit it and re-run")
+            failed = True
+            continue
+        if not kw.hasFolder(handle, folder, APPID):
+            kw.createFolder(handle, folder, APPID)
+        kw.writePassword(handle, folder, entry, best.decode(), APPID)
+        back = str(kw.readPassword(handle, folder, entry, APPID)).encode()
+        if decrypts(back, values) != len(values):
+            sys.exit(f"!! {name}: key read back from KWallet does not decrypt the data")
+        print(f"{name}: {what} KWallet '{folder}/{entry}' -- verified {len(values)}/{len(values)} items")
+    sys.exit(1 if failed else 0)
+
+
+if __name__ == "__main__":
+    main()

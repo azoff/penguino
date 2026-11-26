@@ -185,15 +185,25 @@ COSMIC's packages stay installed. `pop-desktop` requires them and Pop marks
 it protected, so removing COSMIC means overriding an apt guardrail; there is
 no target for that.
 
-### First Plasma login: check Vivaldi
+### First Plasma login: move the keyring to KWallet BEFORE opening apps
 
-Chromium-based browsers pick their encryption store by desktop, and in Plasma
-that is KWallet instead of the GNOME keyring. Cookies and saved passwords
-written under COSMIC may not decrypt, so sites can look logged out. Open
-Vivaldi once and check. If it is logged out, close it without signing in
-again and try launching with `--password-store=gnome-libsecret`; if that fixes
-it, add the flag to the `vivaldi-*.desktop` launchers in
-`conf/.local/share/applications`. 1Password is unaffected.
+Chromium and Electron apps (Vivaldi, Slack, VS Code, Claude desktop) encrypt
+their cookies and saved secrets with a key from the desktop's keystore: the
+GNOME keyring under COSMIC, KWallet (`<Name> Keys/<Name> Safe Storage`) under
+Plasma. Opened on Plasma without that key, an app makes a new one and
+**deletes** what it cannot decrypt, so it is logged out for good (Slack did
+this on 2026-11-25 and had to be restored from the stick). So, in the first
+Plasma session and before opening any of those apps:
+
+```
+make kwallet-migrate     # every GNOME keyring item into KWallet (GPG/SSH passphrases, VS Code GitHub login, ...)
+make kwallet-app-keys    # each app's cookie key, checked against its data first
+```
+
+Both only add to KWallet and leave the GNOME keyring as it is. Signal keeps its
+database key in its own config and is unaffected; so is 1Password. If an app
+was opened too early, quit it without signing in, restore its data folder
+from the stick, then run `make kwallet-app-keys`.
 
 ## Part 4: Set up Plasma for how you work
 
@@ -220,14 +230,33 @@ it, add the flag to the `vivaldi-*.desktop` launchers in
   login goes through `common-auth`, which `make fingerprint-pam` keeps
   fingerprint-free.
 
-### Still to build: per-window memory by monitor set
+### Window Memory: window positions per monitor setup
 
-The reason for this move. First see how far Plasma gets on its own: dock and
-undock a few times and note which windows return to their monitor and size.
-Whatever is still missing becomes a KWin script (records each window's
-geometry per set of connected monitors, replays it on monitor change and
-window open), added here as `conf/kwin/` plus a `make` target. It is not
-written yet; it needs a running Plasma 6 to develop against.
+The reason for this move. `make window-memory` installs a KWin script
+(`conf/kwin/window-memory`) and its storage helper
+(`conf/bin/window-memory-store`).
+
+- **A setup is the exact set of connected monitors**, each identified from
+  its EDID (maker, model, serial), so the same monitor on another dock port is
+  still the same monitor. Laptop alone, laptop + home monitor and laptop +
+  work monitor are three setups; a layout is recalled only when the whole set
+  matches, never because one monitor in it was seen before. Lid closed is a
+  setup of its own.
+- **Meta+Ctrl+S saves** the current setup: for every open app, its monitor,
+  position and size on that monitor, maximized and fullscreen. Apps that are
+  not open keep what was saved for them earlier.
+- **Opening an app** puts it at its saved spot for the current setup. All of
+  an app's windows share one spot; each Vivaldi web app is its own app.
+- **Plugging or unplugging monitors**: once things settle (about 1.5 s),
+  every open window with a saved spot moves there, and a notification names
+  the setup. A setup that was never saved leaves windows alone and says so.
+- **Meta+Ctrl+L** puts windows back where they were saved, any time.
+- Positions are relative to each monitor, so rearranging displays in System
+  Settings does not break a saved layout.
+
+Layouts are in `conf/.config/window-memory/layouts.json` (in this repo, linked
+from `~/.config/window-memory`, so commit it to keep them); a setup's `name` there
+can be renamed by hand. Logs: `journalctl --user -f | grep window-memory`.
 
 ## If something goes wrong
 
@@ -249,9 +278,14 @@ written yet; it needs a running Plasma 6 to develop against.
 | `pop26-backup-size [SKIP_DROPBOX=yes] [LEAN=yes]` | How big the backup would be; copies nothing |
 | `pop26-backup DEST=… [SKIP_DROPBOX=yes] [LEAN=yes]` | Copy home to an ext4 drive, then verify |
 | `pop26-backup-verify DEST=…` | Compare backup against home; fail if a must-have path is missing |
+| `hostname [HOST=azwork]` | Set the machine name and its `/etc/hosts` entry |
 | `plasma` | Install Plasma 6 |
 | `plasma-dm` | Make SDDM the login screen |
-| `plasma-shortcuts` | CopyQ shortcuts in Plasma (`copyq` depends on it) |
+| `plasma-shortcuts` | Meta+Alt+V opens the CopyQ tray menu (`copyq` depends on it) |
 | `konsole` | Konsole font profile (part of `dev`) |
 | `app-profiles` | Install `app-profile` and its profiles |
-| `desktop` | `plasma plasma-shortcuts konsole app-profiles`; part of `everything` |
+| `kwallet-migrate` | Copy the GNOME login keyring into KWallet |
+| `kwallet-app-keys` | Move Vivaldi/Slack/VS Code/Claude cookie keys into KWallet (verified) |
+| `window-memory` | Install the Window Memory KWin script and helper (re-run after editing them) |
+| `plasma-theme` | Breeze Dark colors and icons (fixes COSMIC leftovers in kdeglobals) |
+| `desktop` | `plasma plasma-theme plasma-shortcuts konsole app-profiles window-memory`; part of `everything` |

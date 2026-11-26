@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+"""Copy every item in the GNOME login keyring into KWallet (Plasma's ksecretd).
+
+Both speak the freedesktop Secret Service API: gnome-keyring as
+org.freedesktop.secrets, ksecretd as org.kde.ksecretd. Items keep their label,
+attributes and content type, so once gnome-keyring stops starting and ksecretd
+takes over org.freedesktop.secrets, apps that use libsecret find their secrets
+unchanged.
+
+Only adds to KWallet; the GNOME keyring is never modified. An item already in
+KWallet with the same attributes is left alone. Dry run unless --apply.
+Secrets are never printed.
+
+  keyring-to-kwallet            # list what would be copied
+  keyring-to-kwallet --apply    # copy it
+"""
+import sys
+
+import dbus
+from dbus.mainloop.glib import DBusGMainLoop
+from gi.repository import GLib
+
+SS = "org.freedesktop.Secret"
+PROPS = "org.freedesktop.DBus.Properties"
+SRC_BUS, SRC_COLL = "org.freedesktop.secrets", "/org/freedesktop/secrets/collection/login"
+DST_BUS, DST_COLL = "org.kde.ksecretd", "/org/freedesktop/secrets/aliases/default"
+
+DBusGMainLoop(set_as_default=True)
+bus = dbus.SessionBus()
+
+
+def session(name):
+    svc = dbus.Interface(bus.get_object(name, "/org/freedesktop/secrets"), SS + ".Service")
+    return svc, svc.OpenSession("plain", dbus.String("", variant_level=1))[1]
+
+
+def prompt(name, path):
+    """Run a Secret Service prompt (unlock/create confirmation) and wait for it."""
+    if path == "/":
+        return
+    loop, result = GLib.MainLoop(), {}
+
+    def done(dismissed, _value):
+        result["dismissed"] = dismissed
+        loop.quit()
+
+    obj = bus.get_object(name, path)
+    obj.connect_to_signal("Completed", done, dbus_interface=SS + ".Prompt")
+    dbus.Interface(obj, SS + ".Prompt").Prompt("")
+    loop.run()
+    if result.get("dismissed"):
+        sys.exit("prompt dismissed -- nothing more copied")
+
+
+def main():
+    apply = "--apply" in sys.argv[1:]
+    if bus.get_name_owner(SRC_BUS) == bus.get_name_owner(DST_BUS):
+        sys.exit("org.freedesktop.secrets is already ksecretd -- gnome-keyring is not running, nothing to copy from")
+
+    src_svc, src_sess = session(SRC_BUS)
+    dst_svc, dst_sess = session(DST_BUS)
+    src = bus.get_object(SRC_BUS, SRC_COLL)
+    if src.Get(SS + ".Collection", "Locked", dbus_interface=PROPS):
+        _, p = src_svc.Unlock([SRC_COLL])
+        prompt(SRC_BUS, p)
+    dst = bus.get_object(DST_BUS, DST_COLL)
+    dst_coll = dbus.Interface(dst, SS + ".Collection")
+
+    def dst_value(p):
+        return bytes(dbus.Interface(bus.get_object(DST_BUS, p), SS + ".Item").GetSecret(dst_sess)[2])
+
+    copied = skipped = 0
+    for path in src.Get(SS + ".Collection", "Items", dbus_interface=PROPS):
+        item = bus.get_object(SRC_BUS, path)
+        label = item.Get(SS + ".Item", "Label", dbus_interface=PROPS)
+        attrs = item.Get(SS + ".Item", "Attributes", dbus_interface=PROPS)
+        shown = f"{label or '(no label)'}  {dict((str(k), str(v)) for k, v in attrs.items())}"
+        _, _, value, ctype = dbus.Interface(item, SS + ".Item").GetSecret(src_sess)
+        value = bytes(value)
+        existing = dst_coll.SearchItems(attrs)
+        if any(dst_value(p) == value for p in existing):
+            skipped += 1
+            print(f"  have  {shown}")
+            continue
+        copied += 1
+        action = "fix" if existing else "copy"
+        print(f"  {action if apply else 'would ' + action}  {shown}")
+        if not apply:
+            continue
+        # a copy that differs (e.g. mangled by an earlier run) is replaced
+        for p in existing:
+            dbus.Interface(bus.get_object(DST_BUS, p), SS + ".Item").Delete()
+        # gnome-keyring labels binary secrets (the portal's per-app keys)
+        # text/plain; ksecretd then transcodes them as text and corrupts them
+        try:
+            value.decode("utf-8")
+        except UnicodeDecodeError:
+            ctype = "application/octet-stream"
+        # ksecretd rejects empty labels (gnome-keyring allows them; the portal
+        # stores per-app secrets unlabeled). Apps look items up by attributes,
+        # so a stand-in label changes nothing for them.
+        label = label or str(attrs.get("app_id") or "") or "unlabeled secret"
+        props = {
+            SS + ".Item.Label": dbus.String(label),
+            SS + ".Item.Attributes": dbus.Dictionary(attrs, signature="ss"),
+        }
+        secret = dbus.Struct((dst_sess, dbus.ByteArray(b""), dbus.ByteArray(value), ctype))
+        new, p = dst_coll.CreateItem(props, secret, False)
+        prompt(DST_BUS, p)
+        written = dst_coll.SearchItems(attrs) if new == "/" else [new]
+        if not any(dst_value(w) == value for w in written):
+            sys.exit(f"!! KWallet copy does not match the original: {shown}")
+
+    verb = "copied" if apply else "to copy"
+    print(f"{copied} {verb}, {skipped} already in KWallet")
+    if not apply and copied:
+        print("run with --apply to copy")
+
+
+if __name__ == "__main__":
+    main()

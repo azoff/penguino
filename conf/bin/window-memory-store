@@ -1,0 +1,154 @@
+#!/usr/bin/env python3
+"""Storage and monitor identity for the window-memory KWin script.
+
+KWin scripts cannot write files, and KWin's own output info is thin (the
+laptop panel has no model or serial), so this small D-Bus service does both:
+
+- Resolve(outputs_json) -> json: identifies each connected monitor from its
+  EDID (/sys/class/drm/card*-<connector>/edid: maker, product code, serial,
+  name) and returns the monitor IDs, the setup ID (all monitor IDs, sorted:
+  only an exact match of the whole set recalls a layout) and that setup's
+  saved windows, or null if it was never saved.
+- Save(setup, name, outputs_json, apps_json) -> str: merges the given app
+  positions into the setup (apps not given keep theirs) and notifies.
+- Notify(summary, body): desktop notification on the script's behalf.
+
+Layouts live in ~/.config/window-memory/layouts.json; a setup's "name" there
+can be renamed by hand. Started on demand by D-Bus (see the window-memory
+make target); stays up for the session.
+"""
+import glob
+import json
+import os
+import time
+
+import dbus
+import dbus.service
+from dbus.mainloop.glib import DBusGMainLoop
+from gi.repository import GLib
+
+NAME = "local.penguino.WindowMemory"
+PATH = "/local/penguino/WindowMemory"
+STORE = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"),
+                     "window-memory", "layouts.json")
+
+
+def read_edid(connector):
+    for path in glob.glob(f"/sys/class/drm/card*-{connector}/edid"):
+        try:
+            data = open(path, "rb").read()
+        except OSError:
+            continue
+        if len(data) >= 128:
+            return data
+    return None
+
+
+def parse_edid(d):
+    m = (d[8] << 8) | d[9]
+    maker = "".join(chr(((m >> s) & 31) + 64) for s in (10, 5, 0))
+    product = d[10] | (d[11] << 8)
+    serial = int.from_bytes(d[12:16], "little")
+    text = {}
+    for i in range(54, 126, 18):
+        b = d[i:i + 18]
+        if b[0] == 0 and b[1] == 0 and b[3] in (0xFC, 0xFE, 0xFF):
+            text[b[3]] = b[5:18].decode("ascii", "replace").split("\n")[0].strip()
+    # 0xFC is the monitor name; laptop panels often only have the 0xFE text (part number)
+    return maker, product, text.get(0xFF) or (str(serial) if serial else ""), text.get(0xFC) or text.get(0xFE, "")
+
+
+def identify(output):
+    """(monitor id, human label) for one KWin output dict."""
+    edid = read_edid(output["name"])
+    if edid:
+        maker, product, serial, name = parse_edid(edid)
+        base, label = f"{maker}-{product:04x}", name or f"{maker} {product:04x}"
+    else:
+        maker = output.get("manufacturer") or "?"
+        base, label = f"{maker}-{output.get('model') or '?'}", output.get("model") or maker
+        serial = output.get("serial") or ""
+    # no serial: the connector tells identical models apart
+    return (f"{base}-{serial}" if serial else f"{base}@{output['name']}"), label
+
+
+def load():
+    try:
+        with open(STORE) as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {"setups": {}}
+
+
+def store(doc):
+    os.makedirs(os.path.dirname(STORE), exist_ok=True)
+    tmp = STORE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(doc, f, indent=2, sort_keys=True)
+        f.write("\n")
+    os.replace(tmp, STORE)
+
+
+def identify_all(outputs):
+    """Monitor ids and labels, in the order of outputs."""
+    ids, labels = [], []
+    for o in outputs:
+        i, label = identify(o)
+        ids.append(i)
+        labels.append(label)
+    for dup in {x for x in ids if ids.count(x) > 1}:  # same model + same serial: add connectors
+        ids = [f"{x}@{o['name']}" if x == dup else x for x, o in zip(ids, outputs)]
+    return ids, labels
+
+
+class Store(dbus.service.Object):
+    @dbus.service.method(NAME, in_signature="s", out_signature="s")
+    def Resolve(self, outputs_json):
+        outputs = json.loads(outputs_json)
+        ids, labels = identify_all(outputs)
+        setup = "+".join(sorted(ids))
+        order = sorted(range(len(outputs)), key=lambda k: (outputs[k].get("x", 0), outputs[k].get("y", 0)))
+        default_name = " + ".join(labels[k] for k in order)
+        saved = load()["setups"].get(setup)
+        return json.dumps({
+            "setup": setup,
+            "name": (saved or {}).get("name") or default_name,
+            "outputs": dict(zip((o["name"] for o in outputs), ids)),
+            "apps": saved["apps"] if saved else None,
+        })
+
+    @dbus.service.method(NAME, in_signature="ssss", out_signature="s")
+    def Save(self, setup, name, outputs_json, apps_json):
+        apps = json.loads(apps_json)
+        doc = load()
+        entry = doc["setups"].setdefault(setup, {"name": name, "apps": {}})
+        entry.setdefault("apps", {}).update(apps)
+        ids, labels = identify_all(json.loads(outputs_json))
+        entry["outputs"] = dict(zip(ids, labels))  # for reading the file; not used for matching
+        entry["saved"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+        store(doc)
+        msg = f"{len(apps)} app{'s' if len(apps) != 1 else ''} saved, {len(entry['apps'])} remembered"
+        self.Notify(f"Window layout saved: {entry['name']}", msg)
+        return msg
+
+    @dbus.service.method(NAME, in_signature="ss", out_signature="")
+    def Notify(self, summary, body):
+        try:
+            n = dbus.Interface(dbus.SessionBus().get_object("org.freedesktop.Notifications",
+                                                            "/org/freedesktop/Notifications"),
+                               "org.freedesktop.Notifications")
+            n.Notify("Window Memory", 0, "window", summary, body, [], {}, 4000)
+        except dbus.DBusException:
+            pass
+
+
+def main():
+    DBusGMainLoop(set_as_default=True)
+    bus = dbus.SessionBus()
+    name = dbus.service.BusName(NAME, bus, do_not_queue=True)  # noqa: F841 (keeps the name)
+    Store(bus, PATH)
+    GLib.MainLoop().run()
+
+
+if __name__ == "__main__":
+    main()

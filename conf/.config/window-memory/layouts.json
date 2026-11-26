@@ -1,0 +1,203 @@
+{
+  "setups": {
+    "BOE-095f@eDP-1": {
+      "apps": {
+        "com.anthropic.Claude": {
+          "fullScreen": false,
+          "height": 1504,
+          "maximized": true,
+          "output": "BOE-095f@eDP-1",
+          "width": 2256,
+          "x": 0,
+          "y": 0
+        },
+        "com.slack.Slack": {
+          "fullScreen": false,
+          "height": 1504,
+          "maximized": true,
+          "output": "BOE-095f@eDP-1",
+          "width": 2256,
+          "x": 0,
+          "y": 0
+        },
+        "io.github.mimbrero.WhatsAppDesktop": {
+          "fullScreen": false,
+          "height": 1504,
+          "maximized": true,
+          "output": "BOE-095f@eDP-1",
+          "width": 2256,
+          "x": 0,
+          "y": 0
+        },
+        "org.kde.konsole": {
+          "fullScreen": false,
+          "height": 1504,
+          "maximized": true,
+          "output": "BOE-095f@eDP-1",
+          "width": 2256,
+          "x": 0,
+          "y": 0
+        },
+        "org.signal.Signal": {
+          "fullScreen": false,
+          "height": 1504,
+          "maximized": true,
+          "output": "BOE-095f@eDP-1",
+          "width": 2256,
+          "x": 0,
+          "y": 0
+        },
+        "spotify_spotify": {
+          "fullScreen": false,
+          "height": 1504,
+          "maximized": true,
+          "output": "BOE-095f@eDP-1",
+          "width": 2256,
+          "x": 0,
+          "y": 0
+        },
+        "vivaldi-calendar.vimcal.com__-Default": {
+          "fullScreen": false,
+          "height": 1504,
+          "maximized": true,
+          "output": "BOE-095f@eDP-1",
+          "width": 2256,
+          "x": 0,
+          "y": 0
+        },
+        "vivaldi-mail.missiveapp.com__-Default": {
+          "fullScreen": false,
+          "height": 1504,
+          "maximized": true,
+          "output": "BOE-095f@eDP-1",
+          "width": 2256,
+          "x": 0,
+          "y": 0
+        },
+        "vivaldi-stable": {
+          "fullScreen": false,
+          "height": 1504,
+          "maximized": true,
+          "output": "BOE-095f@eDP-1",
+          "width": 2256,
+          "x": 0,
+          "y": 0
+        },
+        "vivaldi-ticktick.com__webapp-Default": {
+          "fullScreen": false,
+          "height": 1504,
+          "maximized": true,
+          "output": "BOE-095f@eDP-1",
+          "width": 2256,
+          "x": 0,
+          "y": 0
+        }
+      },
+      "name": "NE135FBM-N41 (laptop)",
+      "outputs": {
+        "BOE-095f@eDP-1": "NE135FBM-N41"
+      },
+      "saved": "2026-11-25T23:21:54"
+    },
+    "BOE-095f@eDP-1+GSM-5bf4-303NTWGFL625": {
+      "apps": {
+        "com.anthropic.Claude": {
+          "fullScreen": false,
+          "height": 1504,
+          "maximized": true,
+          "output": "BOE-095f@eDP-1",
+          "width": 2256,
+          "x": 0,
+          "y": 0
+        },
+        "com.slack.Slack": {
+          "fullScreen": false,
+          "height": 1504,
+          "maximized": true,
+          "output": "BOE-095f@eDP-1",
+          "width": 2256,
+          "x": 0,
+          "y": 0
+        },
+        "io.github.mimbrero.WhatsAppDesktop": {
+          "fullScreen": false,
+          "height": 1504,
+          "maximized": true,
+          "output": "BOE-095f@eDP-1",
+          "width": 2256,
+          "x": 0,
+          "y": 0
+        },
+        "org.kde.konsole": {
+          "fullScreen": false,
+          "height": 1504,
+          "maximized": true,
+          "output": "BOE-095f@eDP-1",
+          "width": 2256,
+          "x": 0,
+          "y": 0
+        },
+        "org.signal.Signal": {
+          "fullScreen": false,
+          "height": 1504,
+          "maximized": true,
+          "output": "BOE-095f@eDP-1",
+          "width": 2256,
+          "x": 0,
+          "y": 0
+        },
+        "spotify_spotify": {
+          "fullScreen": false,
+          "height": 1504,
+          "maximized": true,
+          "output": "BOE-095f@eDP-1",
+          "width": 2256,
+          "x": 0,
+          "y": 0
+        },
+        "vivaldi-calendar.vimcal.com__-Default": {
+          "fullScreen": false,
+          "height": 1303,
+          "maximized": false,
+          "output": "GSM-5bf4-303NTWGFL625",
+          "width": 1458,
+          "x": 0,
+          "y": 1577
+        },
+        "vivaldi-mail.missiveapp.com__-Default": {
+          "fullScreen": false,
+          "height": 1504,
+          "maximized": true,
+          "output": "BOE-095f@eDP-1",
+          "width": 2256,
+          "x": 0,
+          "y": 0
+        },
+        "vivaldi-stable": {
+          "fullScreen": false,
+          "height": 1577,
+          "maximized": false,
+          "output": "GSM-5bf4-303NTWGFL625",
+          "width": 2560,
+          "x": 0,
+          "y": 0
+        },
+        "vivaldi-ticktick.com__webapp-Default": {
+          "fullScreen": false,
+          "height": 1303,
+          "maximized": false,
+          "output": "GSM-5bf4-303NTWGFL625",
+          "width": 1102,
+          "x": 1458,
+          "y": 1577
+        }
+      },
+      "name": "NE135FBM-N41 (laptop) + LG SDQHD",
+      "outputs": {
+        "BOE-095f@eDP-1": "NE135FBM-N41 (laptop)",
+        "GSM-5bf4-303NTWGFL625": "LG SDQHD"
+      },
+      "saved": "2026-11-25T23:15:56"
+    }
+  }
+}

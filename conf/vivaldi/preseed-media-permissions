@@ -18,7 +18,6 @@ ORIGINS = [
     "https://mail.missiveapp.com:443,*",
     "https://calendar.vimcal.com:443,*",
     "https://ticktick.com:443,*",
-    "https://spikenow.com:443,*",
 ]
 
 if not PREFS.exists():

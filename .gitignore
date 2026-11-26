@@ -19,3 +19,4 @@ conf/settings.dconf
 # hide any json web tokens
 conf/.config/google-calendar-api/*.json
 __pycache__/
+conf/.config/window-memory/layouts.json.tmp
