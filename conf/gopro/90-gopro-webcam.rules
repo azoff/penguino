@@ -1,0 +1,8 @@
+# Any GoPro (USB vendor 2672) in webcam/"GoPro Connect" mode shows up as a USB
+# network interface: start the webcam service for it. udev can't run
+# long-lived programs, so systemd does (conf/gopro/gopro-webcam@.service).
+# The interface arrives as eth0 and the kernel renames it (enx...), which is a
+# second, "move" event; systemd ignores the device until then and acts on the
+# move event's properties. So match add AND move, and use $name (the final
+# name; %k is still "eth0" during add).
+ACTION=="add|move", SUBSYSTEM=="net", ATTRS{idVendor}=="2672", TAG+="systemd", ENV{SYSTEMD_WANTS}+="gopro-webcam@$name.service"

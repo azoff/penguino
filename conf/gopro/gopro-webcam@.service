@@ -1,0 +1,18 @@
+# GoPro as a webcam on interface %I: started by 90-gopro-webcam.rules when the
+# camera is plugged in, stopped when it is unplugged (BindsTo). Shows up in
+# apps as the "GoPro" camera (/dev/video42, via v4l2loopback).
+[Unit]
+Description=GoPro webcam on %I
+BindsTo=sys-subsystem-net-devices-%i.device
+After=sys-subsystem-net-devices-%i.device NetworkManager.service
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=simple
+# NetworkManager gets the address from the camera's DHCP; the script needs it
+ExecStartPre=/bin/sh -c 'for i in $$(seq 30); do ip -4 -o addr show dev "$$1" | grep -q inet && exit 0; sleep 1; done; echo "no IPv4 address on $$1"; exit 1' _ %I
+ExecStart=/usr/local/sbin/gopro webcam --non-interactive --auto-start --device %I
+# the camera can still be booting ("timing is sometimes crucial"): retry
+Restart=on-failure
+RestartSec=3

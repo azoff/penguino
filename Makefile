@@ -337,6 +337,22 @@ wifi-resume-fix:
 gopro:
 	sudo ln -svf $(ROOT_DIR)/conf/gopro/gopro /usr/local/sbin/gopro
 
+# plug in a GoPro (webcam / GoPro Connect USB mode) and it becomes the "GoPro"
+# camera in Zoom, Vivaldi, OBS...; unplug it and it stops. A udev rule starts
+# gopro-webcam@<interface>.service, which waits for the camera's IP and runs
+# the script. Logs: journalctl -u 'gopro-webcam@*'
+gopro-webcam: gopro
+	sudo apt install -y ffmpeg curl v4l2loopback-dkms
+	sudo ln -svf $(ROOT_DIR)/conf/gopro/90-gopro-webcam.rules /etc/udev/rules.d/90-gopro-webcam.rules
+	sudo install -m644 $(ROOT_DIR)/conf/gopro/gopro-webcam@.service /etc/systemd/system/gopro-webcam@.service
+	sudo systemctl daemon-reload
+	sudo udevadm control --reload
+	@# a GoPro already plugged in: start it now
+	@for d in /sys/class/net/*; do \
+		if [ "$$(cat $$d/device/../idVendor 2>/dev/null)" = 2672 ]; then \
+			echo ">> starting webcam for $${d##*/}"; sudo systemctl start "gopro-webcam@$${d##*/}.service"; fi; \
+	done
+
 # Vivaldi/Chromium segfaults probing uvcvideo *metadata* nodes (laptop camera
 # video1) during getUserMedia -- hide them from user apps via udev. The rule
 # strips the uaccess tag (>70 so it runs after 70-uaccess.rules); the setfacl
